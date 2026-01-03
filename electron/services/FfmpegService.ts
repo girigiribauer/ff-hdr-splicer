@@ -1,6 +1,4 @@
 import { spawn } from 'node:child_process'
-import path from 'node:path'
-import fs from 'node:fs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
@@ -60,26 +58,47 @@ export class FfmpegService {
         }
     }
 
-    async cutSegment(
+    async spliceSegments(
         filePath: string,
-        start: number,
-        duration: number,
+        segments: { start: number; end: number }[],
         outPath: string
-    ): Promise<{ success?: boolean; error?: string; stderr?: string }> {
+    ): Promise<{ success?: boolean; outPath?: string; error?: string; stderr?: string }> {
+        if (segments.length === 0) return { error: 'No segments provided' }
+
         const ffmpegPath = this.getFFmpegPath()
 
-        // Full Re-encode for precision, trying to keep HDR (using x265 default tagging if input allows)
+        // Build Complex Filter
+        // Example:
+        // [0:v]trim=0:2,setpts=PTS-STARTPTS[v0];
+        // [0:a]atrim=0:2,asetpts=PTS-STARTPTS[a0];
+        // [v0][a0]...,concat=n=N:v=1:a=1[v][a]
+
+        let filter = ''
+        let concatInputs = ''
+
+        segments.forEach((seg, i) => {
+            // Video trim: trim works with PTS/metadata, so we need setpts to reset timestamp
+            filter += `[0:v]trim=${seg.start}:${seg.end},setpts=PTS-STARTPTS[v${i}];`
+            // Audio trim: atrim
+            filter += `[0:a]atrim=${seg.start}:${seg.end},asetpts=PTS-STARTPTS[a${i}];`
+
+            concatInputs += `[v${i}][a${i}]`
+        })
+
+        filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[v][a]`
+
         const cmdArgs = [
             '-y',
-            '-ss', start.toString(),
             '-i', filePath,
-            '-t', duration.toString(),
-            '-map', '0',
+            '-filter_complex', filter,
+            '-map', '[v]',
+            '-map', '[a]',
             '-c:v', 'libx265',
             '-crf', '20',
             '-preset', 'fast',
             '-tag:v', 'hvc1',
-            '-c:a', 'copy',
+            '-c:a', 'aac', // Re-encode audio to AAC is safer for concat than copy
+            '-b:a', '192k',
             '-map_metadata', '0',
             outPath
         ]
@@ -89,59 +108,9 @@ export class FfmpegService {
             let stderr = ''
             child.stderr.on('data', (d) => (stderr += d.toString()))
             child.on('close', (code) => {
-                if (code === 0) resolve({ success: true })
-                else resolve({ error: `FFmpeg failed code ${code}`, stderr })
+                if (code === 0) resolve({ success: true, outPath })
+                else resolve({ error: `FFmpeg splice failed code ${code}`, stderr })
             })
         })
-    }
-
-    async runTestCut(filePath: string): Promise<{ success?: boolean; outPath?: string; error?: string; stderr?: string }> {
-        if (!filePath) return { error: 'No file path provided' }
-
-        // 1. Probe Duration
-        let duration: number
-        try {
-            duration = await this.getDuration(filePath)
-        } catch (e: any) {
-            return { error: e.message }
-        }
-
-        if (!duration || isNaN(duration)) return { error: 'Could not determine duration' }
-
-        // 2. Calculate Cut Range (40% - 60%)
-        const start = duration * 0.4
-        const t = duration * 0.2 // Length is 20%
-
-        // 3. Output Path Logic
-        const outputDir = path.join(path.dirname(filePath), '..', 'output')
-
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true })
-        }
-
-        const ext = path.extname(filePath)
-        const originalName = path.basename(filePath, ext)
-        const outPath = this.getUniqueOutputPath(outputDir, originalName, ext)
-
-        // 4. Run FFmpeg Re-encode
-        const result = await this.cutSegment(filePath, start, t, outPath)
-
-        if (result.success) {
-            return { success: true, outPath }
-        } else {
-            return { error: result.error, stderr: result.stderr }
-        }
-    }
-
-    private getUniqueOutputPath(dir: string, name: string, ext: string): string {
-        let candidate = path.join(dir, `${name}_cut${ext}`)
-        if (!fs.existsSync(candidate)) return candidate
-
-        let counter = 2
-        while (true) {
-            candidate = path.join(dir, `${name}_cut_${counter}${ext}`)
-            if (!fs.existsSync(candidate)) return candidate
-            counter++
-        }
     }
 }

@@ -45,6 +45,28 @@ function App() {
     }
   }
 
+  const [spliceSegmentsStr, setSpliceSegmentsStr] = createSignal<string>('0-2, 4-6')
+
+  const runSplice = async () => {
+    if (!testFilePath()) return
+    try {
+      const segments = spliceSegmentsStr().split(',').map(s => {
+        const parts = s.trim().split('-')
+        if (parts.length !== 2) throw new Error(`Invalid format: ${s}`)
+        return { start: parseFloat(parts[0]), end: parseFloat(parts[1]) }
+      })
+
+      addLog(`Starting Splice on: ${testFilePath()} with segments: ${JSON.stringify(segments)}`)
+      const result = await window.ipcRenderer.invoke('run-test-splice', {
+        filePath: testFilePath(),
+        segments
+      })
+      addLog(`Splice Result: ${JSON.stringify(result)}`)
+    } catch (e: any) {
+      addLog(`Splice Error: ${e.message}`)
+    }
+  }
+
   return (
     <div class="container" style={{ padding: '20px', "max-width": '800px', margin: '0 auto', "font-family": 'sans-serif' }}>
       <h1>FF HDR Splicer - Dev Dashboard (SolidJS)</h1>
@@ -61,8 +83,8 @@ function App() {
         </Show>
       </div>
 
-      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fff' }}>
-        <h2>Phase 1: Core Logic Test</h2>
+      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#eef' }}>
+        <h2>Source Selection (Shared)</h2>
         <div style={{ display: 'flex', gap: '10px', "align-items": 'center' }}>
           <input
             type="text"
@@ -71,6 +93,12 @@ function App() {
             onInput={(e) => setTestFilePath(e.currentTarget.value)}
             style={{ flex: 1, padding: '8px', "border-radius": '4px', border: '1px solid #ddd' }}
           />
+        </div>
+      </div>
+
+      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fff' }}>
+        <h2>Phase 1: Core Logic Test</h2>
+        <div style={{ "margin-bottom": '10px' }}>
           <button
             onClick={runTestCut}
             disabled={!testFilePath() || !ffmpegStatus()}
@@ -84,12 +112,43 @@ function App() {
               "font-weight": 'bold'
             }}
           >
-            Test Cut (40%-60%)
+            Test Cut (0-3s)
           </button>
         </div>
         <p style={{ "font-size": '0.8em', color: '#666', "margin-top": '5px' }}>
-          *Logic: Cuts from 40% to 60% of duration (using probe) and saves to file_cut.mp4 in same dir.
+          *Logic: simple splice of the first 3 seconds to verify pipeline.
         </p>
+      </div>
+
+      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fff' }}>
+        <h2>Phase 2: Multi-Segment Splicing</h2>
+        <p style={{ "font-size": '0.9em', color: '#555' }}>
+          Enter segments to splice (e.g. "0-2, 4-6" combines 0s-2s and 4s-6s)
+        </p>
+        <div style={{ display: 'flex', gap: '10px', "align-items": 'center', "margin-top": '10px' }}>
+          <input
+            type="text"
+            placeholder="Segments (e.g. 0-5, 10-15)"
+            value={spliceSegmentsStr()}
+            onInput={(e) => setSpliceSegmentsStr(e.currentTarget.value)}
+            style={{ flex: 1, padding: '8px', "border-radius": '4px', border: '1px solid #ddd' }}
+          />
+          <button
+            onClick={runSplice}
+            disabled={!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()}
+            style={{
+              padding: '10px 20px',
+              cursor: (!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()) ? 'not-allowed' : 'pointer',
+              background: (!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()) ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              "border-radius": '4px',
+              "font-weight": 'bold'
+            }}
+          >
+            Splice
+          </button>
+        </div>
       </div>
 
       <div class="log-area" style={{ background: '#333', color: '#eee', padding: '15px', "border-radius": '4px', height: '300px', "overflow-y": 'auto', "text-align": 'left', "font-family": 'monospace', "font-size": '12px' }}>

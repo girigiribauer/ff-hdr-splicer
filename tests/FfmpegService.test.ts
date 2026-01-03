@@ -35,47 +35,59 @@ describe('FfmpegService 単体テスト', () => {
         }
     })
 
-    it('FFmpegのバイナリが正しく認識され、バージョン情報が取得できること', async () => {
-        const result = await service.checkFFmpeg()
-        expect(result.error).toBeUndefined()
-        expect(result.version).toBeDefined()
-        console.log('Detected FFmpeg Version:', result.version)
+    describe('checkFFmpeg', () => {
+        it('FFmpegのバイナリが正しく認識され、バージョン情報が取得できること', async () => {
+            const result = await service.checkFFmpeg()
+            expect(result.error).toBeUndefined()
+            expect(result.version).toBeDefined()
+            console.log('Detected FFmpeg Version:', result.version)
+        })
     })
 
-    it('存在しないファイルを指定した場合、適切なエラーが返されること', async () => {
-        const result = await service.runTestCut('/path/to/non/existent/file.mov')
-        expect(result.success).toBeUndefined()
-        expect(result.error).toBeDefined()
+    describe('spliceSegments', () => {
+        it('単一区間を指定して切り出しができること (Single Segment)', async () => {
+            if (!fs.existsSync(sampleFile)) return
+
+            // 0-3秒のみ
+            const segments = [{ start: 0, end: 3 }]
+            const outputDir = path.join(path.dirname(sampleFile), '..', 'output')
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true })
+            const outPath = path.join(outputDir, `test_single_${Date.now()}.mov`)
+
+            const result = await service.spliceSegments(sampleFile, segments, outPath)
+
+            expect(result.success).toBe(true)
+            expect(fs.existsSync(outPath)).toBe(true)
+
+            // Duration Check (~3s)
+            const ffprobePath = (service as any).getFFprobePath()
+            const duration = await getDuration(outPath, ffprobePath)
+            expect(duration).toBeGreaterThan(2.5)
+            expect(duration).toBeLessThan(3.5)
+        }, 60000)
+
+        it('複数区間を結合できること (Multi Segments)', async () => {
+            if (!fs.existsSync(sampleFile)) return
+
+            // 0-2秒 と 4-6秒 を結合 (合計4秒)
+            const segments = [
+                { start: 0, end: 2 },
+                { start: 4, end: 6 }
+            ]
+
+            const outputDir = path.join(path.dirname(sampleFile), '..', 'output')
+            const outPath = path.join(outputDir, `test_multi_${Date.now()}.mov`)
+
+            const result = await service.spliceSegments(sampleFile, segments, outPath)
+
+            expect(result.success).toBe(true)
+            expect(fs.existsSync(outPath)).toBe(true)
+
+            // Duration Check (~4s)
+            const ffprobePath = (service as any).getFFprobePath()
+            const duration = await getDuration(outPath, ffprobePath)
+            expect(duration).toBeGreaterThan(3.5)
+            expect(duration).toBeLessThan(4.5)
+        }, 60000)
     })
-
-    it('動画の切り出しが成功し、ユニークなファイル名で出力されること', async () => {
-        if (!fs.existsSync(sampleFile)) {
-            console.log('サンプルファイルがないためスキップします')
-            return
-        }
-
-        // 1回目の実行
-        const result1 = await service.runTestCut(sampleFile)
-
-        expect(result1.success).toBe(true)
-        expect(result1.outPath).toBeDefined()
-        expect(fs.existsSync(result1.outPath!)).toBe(true)
-        console.log('Output 1:', result1.outPath)
-
-        // 生成された動画の長さをチェック (元の20%程度になっているはず)
-        // something.mov は約12秒なので、2.4秒程度
-        const ffprobePath = (service as any).getFFprobePath() // private method access for test
-        const duration = await getDuration(result1.outPath!, ffprobePath)
-        expect(duration).toBeGreaterThan(0)
-        console.log(`Output Duration: ${duration}s`)
-
-        // 2回目の実行 (ファイル名重複回避のテスト)
-        const result2 = await service.runTestCut(sampleFile)
-        expect(result2.success).toBe(true)
-        expect(result2.outPath).not.toBe(result1.outPath) // パスが異なること
-        expect(result2.outPath).toContain('_cut_') // プレフィックス/サフィックスの確認
-        expect(fs.existsSync(result2.outPath!)).toBe(true)
-
-        console.log('Output 2 (Unique):', result2.outPath)
-    }, 60000) // エンコード時間を考慮して長めに
 })
