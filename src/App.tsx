@@ -1,27 +1,33 @@
 import { createSignal, onMount, For, Show } from 'solid-js'
 import './App.css'
+import { SourceSelector } from './components/SourceSelector'
+import { VideoEditor } from './components/VideoEditor'
+
+type Stage = 'SELECT' | 'EDIT'
 
 function App() {
   const [ffmpegStatus, setFfmpegStatus] = createSignal<{ version: string; path: string } | null>(null)
   const [error, setError] = createSignal<string>('')
-  // Default path for easier testing
-  const [testFilePath, setTestFilePath] = createSignal<string>('/Users/y/works/ff-hdr-splicer/test-samples/something.mov')
   const [log, setLog] = createSignal<string[]>([])
 
-  const addLog = (msg: string) => setLog(prev => [...prev, msg])
+  // App State
+  const [stage, setStage] = createSignal<Stage>('SELECT')
+  const [selectedFile, setSelectedFile] = createSignal<string>('')
+
+  // Log Modal State
+  const [showLogs, setShowLogs] = createSignal<boolean>(false)
+
+  const addLog = (msg: string) => setLog(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`])
 
   const checkFFmpeg = async () => {
     try {
-      addLog('Checking FFmpeg...')
       const result = await window.ipcRenderer.invoke('check-ffmpeg')
-      console.log(result)
       if (result.error) {
         setError(result.error)
         addLog(`Error: ${result.error}`)
       } else {
         setFfmpegStatus(result)
         setError('')
-        addLog(`Found FFmpeg: ${result.version} at ${result.path}`)
       }
     } catch (e: any) {
       setError(e.message)
@@ -34,131 +40,82 @@ function App() {
     checkFFmpeg()
   })
 
-  const runTestCut = async () => {
-    if (!testFilePath()) return
-    try {
-      addLog(`Starting Test Cut on: ${testFilePath()}`)
-      const result = await window.ipcRenderer.invoke('run-test-cut', { filePath: testFilePath() })
-      addLog(`Test Cut Result: ${JSON.stringify(result)}`)
-    } catch (e: any) {
-      addLog(`Cut Error: ${e.message}`)
-    }
+  // Handlers
+  const handleFileLoaded = (path: string) => {
+    setSelectedFile(path)
+    setStage('EDIT')
+    addLog(`File loaded: ${path}`)
   }
 
-  const [spliceSegmentsStr, setSpliceSegmentsStr] = createSignal<string>('0-2, 4-6')
-
-  const runSplice = async () => {
-    if (!testFilePath()) return
-    try {
-      const segments = spliceSegmentsStr().split(',').map(s => {
-        const parts = s.trim().split('-')
-        if (parts.length !== 2) throw new Error(`Invalid format: ${s}`)
-        return { start: parseFloat(parts[0]), end: parseFloat(parts[1]) }
-      })
-
-      addLog(`Starting Splice on: ${testFilePath()} with segments: ${JSON.stringify(segments)}`)
-      const result = await window.ipcRenderer.invoke('run-test-splice', {
-        filePath: testFilePath(),
-        segments
-      })
-      addLog(`Splice Result: ${JSON.stringify(result)}`)
-    } catch (e: any) {
-      addLog(`Splice Error: ${e.message}`)
-    }
+  const handleBack = () => {
+    setStage('SELECT')
+    setSelectedFile('')
+    addLog('Unloaded file, returned to selection.')
   }
 
   return (
-    <div class="container" style={{ padding: '20px', "max-width": '800px', margin: '0 auto', "font-family": 'sans-serif' }}>
-      <h1>FF HDR Splicer - Dev Dashboard (SolidJS)</h1>
+    <div class="container">
+      {/* Main Content Area */}
+      <div class="main-content">
+        <Show when={stage() === 'SELECT'}>
+          <SourceSelector
+            ffmpegStatus={ffmpegStatus()}
+            onLoaded={handleFileLoaded}
+            addLog={addLog}
+          />
+        </Show>
 
-      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fafafa' }}>
-        <h2>Phase 0: Environment</h2>
-        <Show
-          when={ffmpegStatus()}
-          fallback={<div style={{ color: 'orange' }}>Checking FFmpeg...</div>}
-        >
-          <div style={{ "margin-top": '10px', "font-size": '0.9em', color: 'green' }}>
-            ✅ Ready: {ffmpegStatus()?.version}
+        <Show when={stage() === 'EDIT'}>
+          <VideoEditor
+            filePath={selectedFile()}
+            onBack={handleBack}
+            addLog={addLog}
+            ffmpegStatus={ffmpegStatus()}
+          />
+        </Show>
+
+        <Show when={error()}>
+          <div style={{ color: 'red', "margin-top": '10px' }}>Error: {error()}</div>
+        </Show>
+
+        {/* Log Modal Overlay */}
+        <Show when={showLogs()}>
+          <div class="log-modal">
+            <div class="log-header">
+              <span>Application Logs</span>
+              <button
+                onClick={() => setShowLogs(false)}
+                style={{ background: 'transparent', border: 'none', color: '#aaa', padding: 0, "font-size": '16px' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div class="log-body">
+              <For each={log()}>
+                {(l) => <div class="log-entry">{l}</div>}
+              </For>
+            </div>
           </div>
         </Show>
       </div>
 
-      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#eef' }}>
-        <h2>Source Selection (Shared)</h2>
-        <div style={{ display: 'flex', gap: '10px', "align-items": 'center' }}>
-          <input
-            type="text"
-            placeholder="Absolute Path to HDR Video"
-            value={testFilePath()}
-            onInput={(e) => setTestFilePath(e.currentTarget.value)}
-            style={{ flex: 1, padding: '8px', "border-radius": '4px', border: '1px solid #ddd' }}
-          />
+      {/* Footer Area */}
+      <div class="footer">
+        <div style={{ "margin-right": 'auto', "font-size": '0.8em', color: '#666' }}>
+          <Show when={ffmpegStatus()} fallback="Checking Env...">
+            FFmpeg: {ffmpegStatus()?.version}
+          </Show>
         </div>
-      </div>
 
-      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fff' }}>
-        <h2>Phase 1: Core Logic Test</h2>
-        <div style={{ "margin-bottom": '10px' }}>
-          <button
-            onClick={runTestCut}
-            disabled={!testFilePath() || !ffmpegStatus()}
-            style={{
-              padding: '10px 20px',
-              cursor: (!testFilePath() || !ffmpegStatus()) ? 'not-allowed' : 'pointer',
-              background: (!testFilePath() || !ffmpegStatus()) ? '#ccc' : '#007BFF',
-              color: 'white',
-              border: 'none',
-              "border-radius": '4px',
-              "font-weight": 'bold'
-            }}
-          >
-            Test Cut (0-3s)
-          </button>
-        </div>
-        <p style={{ "font-size": '0.8em', color: '#666', "margin-top": '5px' }}>
-          *Logic: simple splice of the first 3 seconds to verify pipeline.
-        </p>
+        {/* Log Toggle Button */}
+        <button
+          class="btn-secondary"
+          onClick={() => setShowLogs(!showLogs())}
+          style={{ padding: '6px 12px', "font-size": '12px' }}
+        >
+          Log
+        </button>
       </div>
-
-      <div class="card" style={{ border: '1px solid #ccc', padding: '15px', "margin-bottom": '15px', "border-radius": '8px', background: '#fff' }}>
-        <h2>Phase 2: Multi-Segment Splicing</h2>
-        <p style={{ "font-size": '0.9em', color: '#555' }}>
-          Enter segments to splice (e.g. "0-2, 4-6" combines 0s-2s and 4s-6s)
-        </p>
-        <div style={{ display: 'flex', gap: '10px', "align-items": 'center', "margin-top": '10px' }}>
-          <input
-            type="text"
-            placeholder="Segments (e.g. 0-5, 10-15)"
-            value={spliceSegmentsStr()}
-            onInput={(e) => setSpliceSegmentsStr(e.currentTarget.value)}
-            style={{ flex: 1, padding: '8px', "border-radius": '4px', border: '1px solid #ddd' }}
-          />
-          <button
-            onClick={runSplice}
-            disabled={!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()}
-            style={{
-              padding: '10px 20px',
-              cursor: (!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()) ? 'not-allowed' : 'pointer',
-              background: (!testFilePath() || !ffmpegStatus() || !spliceSegmentsStr()) ? '#ccc' : '#28a745',
-              color: 'white',
-              border: 'none',
-              "border-radius": '4px',
-              "font-weight": 'bold'
-            }}
-          >
-            Splice
-          </button>
-        </div>
-      </div>
-
-      <div class="log-area" style={{ background: '#333', color: '#eee', padding: '15px', "border-radius": '4px', height: '300px', "overflow-y": 'auto', "text-align": 'left', "font-family": 'monospace', "font-size": '12px' }}>
-        <For each={log()}>
-          {(l) => <div>{l}</div>}
-        </For>
-      </div>
-      <Show when={error()}>
-        <p style={{ color: 'red' }}>Last Error: {error()}</p>
-      </Show>
     </div>
   )
 }
