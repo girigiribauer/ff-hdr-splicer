@@ -1,5 +1,7 @@
-import { createSignal, onMount, onCleanup, Show } from 'solid-js'
-import { RangeSlider, Segment } from './ui/RangeSlider'
+import { createSignal, onMount, onCleanup } from 'solid-js'
+import { RangeSlider } from './ui/RangeSlider'
+import { Segment } from '../models/Segment'
+import { createSegmentSpecs, getNextSelectedId } from '../services/timeline'
 
 interface VideoEditorProps {
     filePath: string
@@ -13,10 +15,6 @@ export function VideoEditor(props: VideoEditorProps) {
     const [currentTime, setCurrentTime] = createSignal<number>(0)
     const [segments, setSegments] = createSignal<Segment[]>([])
     const [selectedSegmentId, setSelectedSegmentId] = createSignal<string | null>(null)
-
-    // Video dimension state
-    const [videoDimensions, setVideoDimensions] = createSignal({ width: 0, height: 0 })
-
     const [bussy, setBussy] = createSignal<boolean>(false)
     const [videoRef, setVideoRef] = createSignal<HTMLVideoElement | undefined>(undefined)
 
@@ -27,7 +25,6 @@ export function VideoEditor(props: VideoEditorProps) {
         const vid = e.target as HTMLVideoElement
         if (isFinite(vid.duration)) {
             setDuration(vid.duration)
-            setVideoDimensions({ width: vid.videoWidth, height: vid.videoHeight })
             // Default: Select Initial 10% - 30%
             if (segments().length === 0) {
                 const newId = crypto.randomUUID()
@@ -58,51 +55,18 @@ export function VideoEditor(props: VideoEditorProps) {
     }
 
     const handleAddSegment = (time: number, initialDuration: number = 2.0) => {
-        let start = time
-        let end = time + initialDuration
-
-        const sorted = [...segments()].sort((a, b) => a.start - b.start)
-        const nextSeg = sorted.find(s => s.start >= time)
-
-        if (nextSeg) {
-            // If we are about to overlap next segment
-            if (end > nextSeg.start) end = nextSeg.start
-            // Check if strict collision (start point inside existing segment? No, find(s.start >= time) ensures start is before nextSeg start)
-            // But wait, if time is inside a segment? RangeSlider prevents clicking there usually.
-
-            // If duration is 0 (drawing), we only care if we are literally touching the next segment start
-            if (initialDuration === 0) {
-                if (nextSeg.start - start < 0.01) return null // Too close
-            } else {
-                // For fixed duration, if it doesn't fit, we might snap or fail
-                if (end - start < 0.1) {
-                    if (nextSeg.start - start < 0.1) return null;
-                    end = nextSeg.start
-                }
-            }
-        }
-        if (end > duration()) end = duration()
+        const specs = createSegmentSpecs(segments(), time, initialDuration, duration())
+        if (!specs) return null
 
         const newId = crypto.randomUUID()
-        setSegments(prev => [...prev, { id: newId, start, end }])
+        setSegments(prev => [...prev, { id: newId, ...specs }])
         setSelectedSegmentId(newId)
         return newId
     }
 
     const handleRemoveSegment = (id: string) => {
-        // Auto-select logic: Find neighbor before removing
-        const sorted = [...segments()].sort((a, b) => a.start - b.start)
-        const index = sorted.findIndex(s => s.id === id)
-
-        let nextSelectedId: string | null = null
-        if (selectedSegmentId() === id && index !== -1) {
-            // Try next, then prev
-            if (index + 1 < sorted.length) {
-                nextSelectedId = sorted[index + 1].id
-            } else if (index - 1 >= 0) {
-                nextSelectedId = sorted[index - 1].id
-            }
-        }
+        // Auto-select logic
+        const nextSelectedId = getNextSelectedId(segments(), id)
 
         setSegments(prev => prev.filter(s => s.id !== id))
         if (selectedSegmentId() === id) {
@@ -234,7 +198,7 @@ export function VideoEditor(props: VideoEditorProps) {
                 "align-items": 'center',
                 cursor: 'pointer',
                 position: 'relative'
-            }} onClick={(e) => {
+            }} onClick={() => {
                 const v = videoRef()
                 if (v) v.paused ? v.play() : v.pause()
             }}>

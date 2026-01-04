@@ -1,11 +1,7 @@
 import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
 import './RangeSlider.css'
-
-export interface Segment {
-    id: string
-    start: number
-    end: number
-}
+import { resizeSegment } from '../../services/timeline'
+import { Segment } from '../../models/Segment'
 
 interface RangeSliderProps {
     min: number
@@ -93,41 +89,38 @@ export function RangeSlider(props: RangeSliderProps) {
         const seg = props.segments.find(s => s.id === targetId)
         if (!seg) return
 
-        // Constraints logic
-        const sorted = [...props.segments].sort((a, b) => a.start - b.start)
-        const index = sorted.findIndex(s => s.id === targetId)
-        const prevSeg = index > 0 ? sorted[index - 1] : null
-        const nextSeg = index < sorted.length - 1 ? sorted[index + 1] : null
-
-        const minTime = prevSeg ? prevSeg.end : props.min
-        const maxTime = nextSeg ? nextSeg.start : props.max
-
         if (type === 'start') {
-            let newStart = time
-            if (newStart < minTime) newStart = minTime
-            if (newStart > seg.end - 0.1) newStart = seg.end - 0.1
-            if (newStart !== seg.start) {
-                props.onChange(seg.id, newStart, seg.end)
+            const { start } = resizeSegment(props.segments, seg.id, time, seg.end, props.max)
+            if (start !== seg.start) {
+                props.onChange(seg.id, start, seg.end)
             }
         } else if (type === 'end') {
-            let newEnd = time
+            let targetEnd = time
+            // If Creating, prevent going backwards (simple check before calling logic)
+            if (isCreating && targetEnd < seg.start) targetEnd = seg.start
 
-            // If Creating, allow snapping or min length
-            if (isCreating) {
-                // Allow it to grow. If it's less than start + min, it stays at start + min?
-                // Actually we want user to drag it out.
-                if (newEnd < seg.start) newEnd = seg.start // Can't go backwards (yet)
-            }
-
-            if (newEnd < seg.start + 0.1) newEnd = seg.start + 0.1
-            if (newEnd > maxTime) newEnd = maxTime
-            if (newEnd !== seg.end) {
-                props.onChange(seg.id, seg.start, newEnd)
+            const { end } = resizeSegment(props.segments, seg.id, seg.start, targetEnd, props.max)
+            if (end !== seg.end) {
+                props.onChange(seg.id, seg.start, end)
             }
         } else if (type === 'move') {
             const duration = seg.end - seg.start
             let newStart = time - (duration / 2)
             let newEnd = newStart + duration
+
+            // Move logic is slightly different (sliding window),
+            // but we can reuse clamp logic or keep it simple as it's just bounds check.
+            // Let's keep inline for move as it affects both start/end simultaneously
+            // and resizeSegment calculates *one* edge clamping usually.
+            // Or better: Use findOverlap?
+
+            // Re-implement move constraints using raw lookups for now to match safety
+            const sorted = [...props.segments].sort((a, b) => a.start - b.start)
+            const index = sorted.findIndex(s => s.id === targetId)
+            const prevSeg = index > 0 ? sorted[index - 1] : null
+            const nextSeg = index < sorted.length - 1 ? sorted[index + 1] : null
+            const minTime = prevSeg ? prevSeg.end : props.min
+            const maxTime = nextSeg ? nextSeg.start : props.max
 
             if (newStart < minTime) { newStart = minTime; newEnd = newStart + duration; }
             if (newEnd > maxTime) { newEnd = maxTime; newStart = newEnd - duration; }
@@ -145,7 +138,6 @@ export function RangeSlider(props: RangeSliderProps) {
             const seg = props.segments.find(s => s.id === state.targetId)
             if (seg && (seg.end - seg.start < 0.5)) {
                 // Expand to 2s or max available
-                const nextMax = props.max // Simplified, ideally check neighbor
                 // Re-check neighbor specifically
                 const sorted = [...props.segments].sort((a, b) => a.start - b.start)
                 const index = sorted.findIndex(s => s.id === state.targetId)
@@ -186,7 +178,7 @@ export function RangeSlider(props: RangeSliderProps) {
                 <div class="seek-track-line" />
                 <div
                     class="seek-playhead-knob"
-                    style={{ left: `${getPercent(props.currentTime)}%` }}
+                    style={{ left: `${getPercent(props.currentTime)}% ` }}
                 />
             </div>
 
@@ -202,8 +194,8 @@ export function RangeSlider(props: RangeSliderProps) {
                             <div
                                 class={`range-segment ${props.selectedSegmentId === segment.id ? 'selected' : ''}`}
                                 style={{
-                                    left: `${getPercent(segment.start)}%`,
-                                    width: `${getPercent(segment.end) - getPercent(segment.start)}%`
+                                    left: `${getPercent(segment.start)}% `,
+                                    width: `${getPercent(segment.end) - getPercent(segment.start)}% `
                                 }}
                                 onMouseDown={(e) => handleSegmentMouseDown(e, segment.id)}
                             >
