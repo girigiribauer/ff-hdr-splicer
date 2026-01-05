@@ -1,9 +1,10 @@
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 
 interface SourceSelectorProps {
     ffmpegStatus: { version: string; path: string } | null
     onLoaded: (path: string) => void
     addLog: (msg: string) => void
+    error?: string
 }
 
 export function SourceSelector(props: SourceSelectorProps) {
@@ -79,7 +80,7 @@ export function SourceSelector(props: SourceSelectorProps) {
                 "align-items": 'center',
                 gap: '20px'
             }}>
-                <div style={{ "font-size": '48px', opacity: 0.5 }}>📂</div>
+                <div style={{ "font-size": '48px', opacity: 0.5 }}>🎬</div>
 
                 <div>
                     <h2 style={{ "margin-top": 0, "margin-bottom": '10px', color: '#333' }}>
@@ -89,6 +90,21 @@ export function SourceSelector(props: SourceSelectorProps) {
                         Supports HDR video files (.mov, .mp4, .mkv)
                     </p>
                 </div>
+
+                <Show when={props.error}>
+                    <div style={{
+                        background: '#FFF2F2',
+                        color: '#D8000C',
+                        padding: '12px',
+                        "border-radius": '8px',
+                        "border": '1px solid #FFD2D2',
+                        "font-size": '14px',
+                        "width": '100%',
+                        "white-space": 'pre-wrap'
+                    }}>
+                        {props.error}
+                    </div>
+                </Show>
 
                 <button
                     class="btn-primary"

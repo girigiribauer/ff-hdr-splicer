@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { FfmpegService } from './services/FfmpegService'
+import * as FfmpegService from './services/FfmpegService'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -52,10 +52,17 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
-  const ffmpegService = new FfmpegService()
-
   ipcMain.handle('check-ffmpeg', async () => {
-    return await ffmpegService.checkFFmpeg()
+    return await FfmpegService.checkFFmpeg()
+  })
+
+  ipcMain.handle('run-probe', async (_event, filePath) => {
+    try {
+      const metadata = await FfmpegService.getVideoMetadata(filePath)
+      return { success: true, metadata }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
   })
 
   ipcMain.handle('run-test-splice', async (_event, args) => {
@@ -81,7 +88,7 @@ app.whenReady().then(() => {
       outPath = path.join(outDirTarget, `${name}_splice_${Date.now()}${ext}`)
     }
 
-    return await ffmpegService.spliceSegments(filePath, segments, outPath)
+    return await FfmpegService.spliceSegments(filePath, segments, outPath)
   })
 
   ipcMain.handle('show-open-dialog', async () => {

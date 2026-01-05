@@ -36,9 +36,36 @@ export function VideoEditor(props: VideoEditorProps) {
         }
     }
 
+    let animationFrameId: number
+
+    const loop = () => {
+        const vid = videoRef()
+        if (vid && !vid.paused && !vid.ended) {
+            setCurrentTime(vid.currentTime)
+            animationFrameId = requestAnimationFrame(loop)
+        }
+    }
+
+    const handlePlay = () => {
+        loop()
+    }
+
+    const handlePause = () => {
+        cancelAnimationFrame(animationFrameId)
+    }
+
+    onCleanup(() => {
+        cancelAnimationFrame(animationFrameId)
+    })
+
     const handleTimeUpdate = (e: Event) => {
         const vid = e.target as HTMLVideoElement
-        setCurrentTime(vid.currentTime)
+        // Only update if not playing to avoid conflict/double updates,
+        // though Solid's batching usually handles it.
+        // But mainly we trust rAF during playback.
+        if (vid.paused) {
+            setCurrentTime(vid.currentTime)
+        }
     }
 
     const handleSeek = (time: number) => {
@@ -208,6 +235,8 @@ export function VideoEditor(props: VideoEditorProps) {
                     style={{ width: '100%', height: '100%', "max-height": '100%', "object-fit": 'contain' }}
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={handleTimeUpdate}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
                 />
             </div>
 

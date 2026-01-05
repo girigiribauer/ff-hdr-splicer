@@ -2,6 +2,7 @@ import { createSignal, onMount, For, Show } from 'solid-js'
 import './App.css'
 import { SourceSelector } from './components/SourceSelector'
 import { VideoEditor } from './components/VideoEditor'
+import { validateHDR } from './services/validator'
 
 type Stage = 'SELECT' | 'EDIT'
 
@@ -41,10 +42,41 @@ function App() {
   })
 
   // Handlers
-  const handleFileLoaded = (path: string) => {
+  const handleFileLoaded = async (path: string) => {
+    // 1. Validation: HDR Check
+    try {
+      const probe = await window.ipcRenderer.invoke('run-probe', path)
+      if (!probe.success) {
+        throw new Error(`Failed to probe file: ${probe.error}`)
+      }
+
+      const stream = probe.metadata.streams?.[0]
+      if (!stream) throw new Error('No video stream found')
+
+      const transfer = stream.color_transfer
+      const primaries = stream.color_primaries
+
+      console.log('Probe:', { transfer, primaries })
+
+      const validation = validateHDR(transfer, primaries)
+      if (!validation.valid) {
+        // Japanese Error Message
+        setError('このファイルは読み込めません。\nこのツールはHDR動画 (Rec.2020 PQ/HLG) 専用です。')
+        // Log original technical error
+        addLog(`Validation Failed: ${validation.error}`)
+        return
+      }
+
+    } catch (e: any) {
+      setError(e.message)
+      addLog(`Validation Error: ${e.message}`)
+      return
+    }
+
     setSelectedFile(path)
     setStage('EDIT')
-    addLog(`File loaded: ${path}`)
+    setError('')
+    addLog(`File loaded (HDR Verified): ${path}`)
   }
 
   const handleBack = () => {
@@ -62,6 +94,7 @@ function App() {
             ffmpegStatus={ffmpegStatus()}
             onLoaded={handleFileLoaded}
             addLog={addLog}
+            error={error()}
           />
         </Show>
 
@@ -74,7 +107,7 @@ function App() {
           />
         </Show>
 
-        <Show when={error()}>
+        <Show when={error() && stage() !== 'SELECT'}>
           <div style={{ color: 'red', "margin-top": '10px' }}>Error: {error()}</div>
         </Show>
 
@@ -99,7 +132,6 @@ function App() {
         </Show>
       </div>
 
-      {/* Footer Area */}
       <div class="footer">
         <div style={{ "margin-right": 'auto', "font-size": '0.8em', color: '#666' }}>
           <Show when={ffmpegStatus()} fallback="Checking Env...">
@@ -107,7 +139,6 @@ function App() {
           </Show>
         </div>
 
-        {/* Log Toggle Button */}
         <button
           class="btn-secondary"
           onClick={() => setShowLogs(!showLogs())}

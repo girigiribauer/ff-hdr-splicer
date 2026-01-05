@@ -2,11 +2,30 @@ import { describe, it, expect } from 'vitest'
 import { Segment } from '../../src/models/Segment'
 import { createSegmentSpecs, getNextSelectedId, resizeSegment, validateSegment } from '../../src/services/timeline'
 
-describe('タイムラインのロジック', () => {
-
+describe('timeline', () => {
     const maxDur = 100
 
-    describe('新規セグメント作成 (createSegmentSpecs)', () => {
+    describe('validateSegment', () => {
+        it('終了時間 < 開始時間の場合、終了時間を開始時間に合わせる (長さ0)', () => {
+            const seg = { id: '1', start: 10, end: 5 }
+            const res = validateSegment(seg, maxDur)
+            expect(res).toEqual({ id: '1', start: 10, end: 10 })
+        })
+
+        it('マイナスの開始時間を0に補正する', () => {
+            const seg = { id: '1', start: -5, end: 10 }
+            const res = validateSegment(seg, maxDur)
+            expect(res.start).toBe(0)
+        })
+
+        it('最大時間を超える終了時間を補正する', () => {
+            const seg = { id: '1', start: 90, end: 110 }
+            const res = validateSegment(seg, maxDur)
+            expect(res.end).toBe(maxDur)
+        })
+    })
+
+    describe('createSegmentSpecs', () => {
         it('空きスペースがある場合、指定通りのセグメントを作成できる', () => {
             const result = createSegmentSpecs([], 10, 5, maxDur)
             expect(result).toEqual({ start: 10, end: 15 })
@@ -26,7 +45,7 @@ describe('タイムラインのロジック', () => {
         })
     })
 
-    describe('セグメントのリサイズ (resizeSegment)', () => {
+    describe('resizeSegment', () => {
         const segs: Segment[] = [
             { id: '1', start: 0, end: 10 },
             { id: '2', start: 20, end: 30 },
@@ -46,7 +65,7 @@ describe('タイムラインのロジック', () => {
         })
     })
 
-    describe('削除時の自動選択 (getNextSelectedId)', () => {
+    describe('getNextSelectedId', () => {
         const segs: Segment[] = [
             { id: 'A', start: 0, end: 10 },
             { id: 'B', start: 20, end: 30 },

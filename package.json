@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder -p never",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "test": "vitest run",
+    "test": "vitest run --reporter verbose",
     "preview": "vite preview"
   },
   "dependencies": {
