@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import * as FfmpegService from './services/FfmpegService'
+import { handleMediaRequest } from './protocols/MediaProtocol'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -13,6 +14,27 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
+const template: Electron.MenuItemConstructorOptions[] = [
+  {
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'quit' }
+    ]
+  },
+  {
+    label: 'View',
+    submenu: [
+      { role: 'reload' },
+      { role: 'toggleDevTools' }
+    ]
+  }
+]
+
+const menu = Menu.buildFromTemplate(template)
+Menu.setApplicationMenu(menu)
+
 let win: BrowserWindow | null
 
 function createWindow() {
@@ -20,7 +42,7 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
-      webSecurity: false // Disabled to allow file:// access for video
+      webSecurity: true
     },
   })
 
@@ -41,6 +63,19 @@ app.on('window-all-closed', () => {
     win = null
   }
 })
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+])
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
@@ -107,4 +142,8 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+})
+
+app.whenReady().then(() => {
+  protocol.handle('media', handleMediaRequest)
 })

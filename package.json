@@ -34,5 +34,25 @@
     "vite-plugin-solid": "^2.11.10",
     "vitest": "^4.0.16"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "appId": "com.user.ff-hdr-splicer",
+    "productName": "FF HDR Splicer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist",
+      "dist-electron"
+    ],
+    "mac": {
+      "target": "dmg",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**",
+      "**/node_modules/ffprobe-static/**"
+    ]
+  }
 }

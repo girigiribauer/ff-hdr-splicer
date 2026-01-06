@@ -26,8 +26,8 @@ export function VideoEditor(props: VideoEditorProps) {
         crossfadeDuration: 1.0
     })
 
-    // File protocol
-    const getMediaUrl = (path: string) => `file://${path}`
+    // Media protocol (See main.ts)
+    const getMediaUrl = (path: string) => `media://${path}`
 
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
@@ -216,6 +216,13 @@ export function VideoEditor(props: VideoEditorProps) {
                     onTimeUpdate={handleTimeUpdate}
                     onPlay={handlePlay}
                     onPause={handlePause}
+                    onError={(e) => {
+                        const vid = e.target as HTMLVideoElement
+                        const err = vid.error
+                        props.addLog(`Video Error: ${err ? err.message : 'Unknown error'} (Code: ${err ? err.code : 'N/A'})`)
+                        props.addLog(`Src: ${vid.src}`)
+                        console.error('Video Error:', err)
+                    }}
                 />
             </div>
 
