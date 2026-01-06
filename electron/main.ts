@@ -13,9 +13,6 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-// Reverted custom protocol due to video streaming/seeking issues with net.fetch
-// Back to webSecurity: false for local file access
-
 let win: BrowserWindow | null
 
 function createWindow() {
@@ -66,7 +63,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('run-test-splice', async (_event, args) => {
-    const { filePath, segments, outputDir, outputFilePath } = args
+    const { filePath, segments, outputDir, outputFilePath, fadeOptions } = args
     if (!filePath) return { error: 'No file path provided' }
     if (!segments || segments.length === 0) return { error: 'No segments provided' }
 
@@ -88,7 +85,7 @@ app.whenReady().then(() => {
       outPath = path.join(outDirTarget, `${name}_splice_${Date.now()}${ext}`)
     }
 
-    return await FfmpegService.spliceSegments(filePath, segments, outPath)
+    return await FfmpegService.spliceSegments(filePath, segments, outPath, fadeOptions)
   })
 
   ipcMain.handle('show-open-dialog', async () => {

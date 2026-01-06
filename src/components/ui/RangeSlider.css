@@ -155,3 +155,33 @@
     color: white;
     border-color: #888;
 }
+
+/* --- Fade Handles & Overlays --- */
+/* Fade toggles removed */
+
+.fade-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 15;
+    pointer-events: none;
+}
+
+/* Fade In: Ramps up opacity (Visualized as ramping DOWN the overlay) */
+/* Triangle shape: High at left, low at right */
+.fade-in-overlay {
+    left: 0;
+    width: 60px;
+    /* Fixed visual width for now, corresponding to approx 2s */
+    background: linear-gradient(to bottom right, rgba(255, 255, 255, 0.3) 49%, transparent 50%);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Fade Out: Ramps down opacity (Visualized as ramping UP the overlay) */
+/* Triangle shape: Low at left, High at right */
+.fade-out-overlay {
+    right: 0;
+    width: 60px;
+    background: linear-gradient(to bottom left, rgba(255, 255, 255, 0.3) 49%, transparent 50%);
+    border-right: 1px solid rgba(255, 255, 255, 0.4);
+}

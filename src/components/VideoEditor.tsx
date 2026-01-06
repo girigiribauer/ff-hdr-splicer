@@ -1,5 +1,6 @@
 import { createSignal, onMount, onCleanup } from 'solid-js'
 import { RangeSlider } from './ui/RangeSlider'
+import './VideoEditor.css'
 import { Segment } from '../models/Segment'
 import { createSegmentSpecs, getNextSelectedId } from '../services/timeline'
 
@@ -17,6 +18,13 @@ export function VideoEditor(props: VideoEditorProps) {
     const [selectedSegmentId, setSelectedSegmentId] = createSignal<string | null>(null)
     const [bussy, setBussy] = createSignal<boolean>(false)
     const [videoRef, setVideoRef] = createSignal<HTMLVideoElement | undefined>(undefined)
+
+    // Fade Options
+    const [fadeOptions, setFadeOptions] = createSignal({
+        crossfade: true,
+        fadeDuration: 2.0,
+        crossfadeDuration: 1.0
+    })
 
     // File protocol
     const getMediaUrl = (path: string) => `file://${path}`
@@ -76,7 +84,6 @@ export function VideoEditor(props: VideoEditorProps) {
         }
     }
 
-    // --- Segment Logic ---
     const handleSegmentChange = (id: string, start: number, end: number) => {
         setSegments(prev => prev.map(s => s.id === id ? { ...s, start, end } : s))
     }
@@ -92,7 +99,6 @@ export function VideoEditor(props: VideoEditorProps) {
     }
 
     const handleRemoveSegment = (id: string) => {
-        // Auto-select logic
         const nextSelectedId = getNextSelectedId(segments(), id)
 
         setSegments(prev => prev.filter(s => s.id !== id))
@@ -100,7 +106,6 @@ export function VideoEditor(props: VideoEditorProps) {
             setSelectedSegmentId(nextSelectedId)
         }
     }
-    // ---------------------
 
     const handleExport = async () => {
         if (bussy()) return
@@ -124,13 +129,21 @@ export function VideoEditor(props: VideoEditorProps) {
             const result = await window.ipcRenderer.invoke('run-test-splice', {
                 filePath: props.filePath,
                 segments: exportSegments,
-                outputFilePath: outPath
+                outputFilePath: outPath,
+                fadeOptions: fadeOptions()
             })
 
             if (result.success) {
                 props.addLog(`Success: ${result.outPath}`)
             } else {
                 props.addLog(`Failed: ${result.error}`)
+                if (result.stderr) {
+                    console.error(result.stderr)
+                    // Extract last few lines of stderr for UI log
+                    const lines = result.stderr.split('\n')
+                    const lastLines = lines.slice(-5).join('\n')
+                    props.addLog(`FFmpeg Error Details:\n${lastLines}`)
+                }
             }
         } catch (e: any) {
             props.addLog(`Error: ${e.message}`)
@@ -141,6 +154,11 @@ export function VideoEditor(props: VideoEditorProps) {
 
     // Shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
+        // Prevent shortcuts when typing in inputs
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            return
+        }
+
         if (e.code === 'Space') {
             e.preventDefault()
             const v = videoRef()
@@ -159,80 +177,41 @@ export function VideoEditor(props: VideoEditorProps) {
     })
 
     return (
-        <div class="video-editor-container" style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            "flex-direction": 'column',
-            background: '#202020',
-        }}>
-
-            {/* Header (Gray/Title/Close/Export) */}
-            <div style={{
-                height: '50px',
-                background: '#e0e0e0',
-                display: 'flex',
-                "justify-content": 'space-between',
-                "align-items": 'center',
-                padding: '0 15px',
-                "flex-shrink": 0
-            }}>
-                <div style={{ display: 'flex', "align-items": 'center', gap: '15px' }}>
-                    {/* Rounded Close Button */}
+        <div class="video-editor-container">
+            <div class="video-editor-header">
+                <div class="header-left">
                     <button
                         onClick={props.onBack}
                         title="Close File"
-                        style={{
-                            width: '30px',
-                            height: '30px',
-                            "border-radius": '50%',
-                            border: '1px solid #999',
-                            background: 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            "align-items": 'center',
-                            "justify-content": 'center',
-                            "padding": 0,
-                            "font-size": '14px',
-                            "line-height": 1,
-                            color: '#333'
-                        }}
+                        class="close-btn"
                     >
                         ✕
                     </button>
-                    <span style={{ "font-weight": 'bold', color: '#333' }}>
+                    <span class="file-name">
                         {props.filePath.split(/[\\/]/).pop()}
                     </span>
                 </div>
 
                 <button
-                    class="btn-primary"
+                    class="btn-primary btn-export"
                     onClick={handleExport}
                     disabled={bussy()}
-                    style={{ "font-size": '14px', padding: '6px 16px' }}
                 >
                     {bussy() ? 'Exporting...' : 'Export'}
                 </button>
             </div>
 
-            {/* Video Preview */}
-            <div style={{
-                flex: 1,
-                background: '#000',
-                overflow: 'hidden',
-                display: 'flex',
-                "justify-content": 'center',
-                "align-items": 'center',
-                cursor: 'pointer',
-                position: 'relative'
-            }} onClick={() => {
-                const v = videoRef()
-                if (v) v.paused ? v.play() : v.pause()
-            }}>
+            <div
+                class="video-preview-area"
+                onClick={() => {
+                    const v = videoRef()
+                    if (v) v.paused ? v.play() : v.pause()
+                }}
+            >
                 <video
                     ref={setVideoRef}
                     src={getMediaUrl(props.filePath)}
-                    style={{ width: '100%', height: '100%', "max-height": '100%', "object-fit": 'contain' }}
+                    class="preview-video"
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={handleTimeUpdate}
                     onPlay={handlePlay}
@@ -240,15 +219,7 @@ export function VideoEditor(props: VideoEditorProps) {
                 />
             </div>
 
-            {/* Timeline Area (Fixed Height at Bottom) */}
-            <div style={{
-                height: '60px', /* Matched to RangeSlider CSS */
-                background: '#333',
-                "flex-shrink": 0,
-                display: 'flex',
-                "flex-direction": 'column',
-                "justify-content": 'flex-start' /* Align to top */
-            }}>
+            <div class="timeline-area">
                 <RangeSlider
                     min={0}
                     max={duration()}
@@ -260,7 +231,96 @@ export function VideoEditor(props: VideoEditorProps) {
                     onAddSegment={handleAddSegment}
                     onRemoveSegment={handleRemoveSegment}
                     selectedSegmentId={selectedSegmentId()}
+                    videoFadeDuration={fadeOptions().fadeDuration}
                 />
+            </div>
+
+            <div class="footer-toolbar">
+                <div class="footer-left">
+                    <label class="setting-label">
+                        <input
+                            type="checkbox"
+                            checked={fadeOptions().crossfade}
+                            onChange={(e) => setFadeOptions(prev => ({ ...prev, crossfade: e.currentTarget.checked }))}
+                        />
+                        Enable Transitions
+                    </label>
+
+                    <div class="setting-group">
+                        <span>Fade In/Out:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="5.0"
+                            step="0.1"
+                            value={fadeOptions().fadeDuration}
+                            onChange={(e) => setFadeOptions(prev => ({ ...prev, fadeDuration: parseFloat(e.currentTarget.value) }))}
+                            class="input-number"
+                        />
+                        <span>s</span>
+                    </div>
+
+                    <div class="setting-group">
+                        <span>Join Crossfade:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="5.0"
+                            step="0.1"
+                            value={fadeOptions().crossfadeDuration}
+                            onChange={(e) => setFadeOptions(prev => ({ ...prev, crossfadeDuration: parseFloat(e.currentTarget.value) }))}
+                            class="input-number"
+                        />
+                        <span>s</span>
+                    </div>
+                </div>
+
+                <div class="footer-right">
+                    {selectedSegmentId() !== null ? (() => {
+                        const seg = segments().find(s => s.id === selectedSegmentId())
+                        if (!seg) return <span class="no-selection">Segment not found</span>
+                        return (
+                            <>
+                                <span class="selected-label">Selected:</span>
+                                <div class="segment-editor-group">
+                                    <label>Start:</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={seg.start.toFixed(3)}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.currentTarget.value)
+                                            if (!isNaN(val) && val >= 0 && val < seg.end) {
+                                                setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, start: val } : s))
+                                            }
+                                        }}
+                                        class="input-coord"
+                                    />
+                                </div>
+                                <div class="segment-editor-group">
+                                    <label>End:</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={seg.end.toFixed(3)}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.currentTarget.value)
+                                            if (!isNaN(val) && val > seg.start) {
+                                                setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, end: val } : s))
+                                            }
+                                        }}
+                                        class="input-coord"
+                                    />
+                                </div>
+                                <div class="duration-display">
+                                    ({(seg.end - seg.start).toFixed(2)}s)
+                                </div>
+                            </>
+                        )
+                    })() : (
+                        <span class="no-selection">Select a segment to edit</span>
+                    )}
+                </div>
             </div>
         </div>
     )

@@ -90,31 +90,118 @@ export async function getVideoMetadata(filePath: string): Promise<any> {
 export async function spliceSegments(
     filePath: string,
     segments: { start: number; end: number }[],
-    outPath: string
+    outPath: string,
+    fadeOptions?: { crossfade: boolean; fadeDuration: number; crossfadeDuration: number }
 ): Promise<{ success?: boolean; outPath?: string; error?: string; stderr?: string }> {
     if (segments.length === 0) return { error: 'No segments provided' }
 
     const ffmpegPath = getFFmpegPath()
 
-    // Build Complex Filter
-    // Example:
-    // [0:v]trim=0:2,setpts=PTS-STARTPTS[v0];
-    // [0:a]atrim=0:2,asetpts=PTS-STARTPTS[a0];
-    // [v0][a0]...,concat=n=N:v=1:a=1[v][a]
+    // 1. Probe header info
+    // (Future: Use metadata to set color properties if needed)
+    try {
+        await getVideoMetadata(filePath)
+    } catch (e) {
+        console.warn('Failed to probe video metadata', e)
+    }
 
     let filter = ''
-    let concatInputs = ''
+    const videoDur = fadeOptions?.fadeDuration || 1.0
+    const xDur = fadeOptions?.crossfadeDuration || 1.0
+    const enableTransitions = fadeOptions?.crossfade ?? false
 
-    segments.forEach((seg, i) => {
-        // Video trim: trim works with PTS/metadata, so we need setpts to reset timestamp
-        filter += `[0:v]trim=${seg.start}:${seg.end},setpts=PTS-STARTPTS[v${i}];`
-        // Audio trim: atrim
-        filter += `[0:a]atrim=${seg.start}:${seg.end},asetpts=PTS-STARTPTS[a${i}];`
+    if (enableTransitions && segments.length > 1) {
+        // --- Crossfade Logic ---
 
-        concatInputs += `[v${i}][a${i}]`
-    })
+        let currentOffset = 0
+        let lastVLabel = '[v0]'
+        let lastALabel = '[a0]'
 
-    filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[v][a]`
+        // First Segment: Apply Fade In (if configured)
+        let s0 = segments[0]
+        let v0 = `[0:v]trim=${s0.start}:${s0.end},setpts=PTS-STARTPTS`
+        let a0 = `[0:a]atrim=${s0.start}:${s0.end},asetpts=PTS-STARTPTS`
+
+        if (videoDur > 0) {
+            v0 += `,fade=t=in:st=0:d=${videoDur}`
+            a0 += `,afade=t=in:st=0:d=${videoDur}:curve=desi`
+        }
+        filter += `${v0}[v0];${a0}[a0];`
+
+        // Middle Segments: Just Trim
+        // If there are > 2 segments, these need to be prepared for chaining
+        for (let i = 1; i < segments.length; i++) {
+            let s = segments[i]
+            filter += `[0:v]trim=${s.start}:${s.end},setpts=PTS-STARTPTS[v${i}];`
+            filter += `[0:a]atrim=${s.start}:${s.end},asetpts=PTS-STARTPTS[a${i}];`
+        }
+
+        // Chain xfades
+        for (let i = 0; i < segments.length - 1; i++) {
+            const nextIndex = i + 1
+            const segDuration = segments[i].end - segments[i].start
+
+            // Adjust offset
+            // For the first segment, duration is full, but we need to subtract overlap
+            currentOffset += segDuration - xDur
+
+            const nextVLabel = nextIndex === segments.length - 1 ? '[v_final_pre]' : `[v_merge_${i}]`
+            const nextALabel = nextIndex === segments.length - 1 ? '[a_final_pre]' : `[a_merge_${i}]`
+
+            filter += `${lastVLabel}[v${nextIndex}]xfade=transition=fade:duration=${xDur}:offset=${currentOffset}${nextVLabel};`
+            filter += `${lastALabel}[a${nextIndex}]acrossfade=d=${xDur}:c1=desi:c2=desi${nextALabel};`
+
+            lastVLabel = nextVLabel
+            lastALabel = nextALabel
+        }
+
+        // Final Fade Out (on the already-merged stream)
+        // We need the total duration of the timeline to know where to start fade out.
+        // Total Duration computation:
+        // Sum(All Durations) - (N-1 * Overlap)
+        const totalDuration = segments.reduce((acc, s) => acc + (s.end - s.start), 0) - ((segments.length - 1) * xDur)
+        const fadeOutStart = Math.max(0, totalDuration - videoDur)
+
+        if (videoDur > 0) {
+            filter += `${lastVLabel}fade=t=out:st=${fadeOutStart}:d=${videoDur}[v];`
+            filter += `${lastALabel}afade=t=out:st=${fadeOutStart}:d=${videoDur}:curve=desi[a]`
+        } else {
+            filter += `${lastVLabel}copy[v];${lastALabel}copy[a]` // Or just alias? copy filter is fine.
+        }
+
+    } else {
+        // --- Simple Concat Logic (No Crossfade) ---
+        // If "Enable Transitions" is OFF, we do straight cuts.
+        // OR: If user wants *just* Start/End fades but NO crossfade?
+        // Current UI has one "Enable Transitions" toggle for everything.
+        // So assuming if checked -> Apply Start/End Fades + Crossfades.
+        // But if just 1 segment, crossfade loop doesn't run, so we need single-clip logic here.
+
+        let concatInputs = ''
+        const doFades = enableTransitions && videoDur > 0
+
+        segments.forEach((seg, i) => {
+            let vFilters = `[0:v]trim=${seg.start}:${seg.end},setpts=PTS-STARTPTS`
+            let aFilters = `[0:a]atrim=${seg.start}:${seg.end},asetpts=PTS-STARTPTS`
+
+            // Special Case: Single Segment with Transition ON -> Apply In/Out
+            if (segments.length === 1 && doFades) {
+                const dur = seg.end - seg.start
+                const startOut = Math.max(0, dur - videoDur)
+
+                vFilters += `,fade=t=in:st=0:d=${videoDur}`
+                aFilters += `,afade=t=in:st=0:d=${videoDur}:curve=desi`
+
+                vFilters += `,fade=t=out:st=${startOut}:d=${videoDur}`
+                aFilters += `,afade=t=out:st=${startOut}:d=${videoDur}:curve=desi`
+            }
+
+            filter += `${vFilters}[v${i}];${aFilters}[a${i}];`
+            concatInputs += `[v${i}][a${i}]`
+        })
+
+        filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[v][a]`
+    }
 
     const cmdArgs = [
         '-y',

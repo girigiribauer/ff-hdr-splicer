@@ -1,0 +1,168 @@
+/* Main Container */
+.video-editor-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #202020;
+}
+
+/* Header */
+.video-editor-header {
+    height: 50px;
+    background: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.close-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid #999;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: #333;
+}
+
+.file-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.btn-export {
+    font-size: 14px;
+    padding: 6px 16px;
+}
+
+/* Video Preview Area */
+.video-preview-area {
+    flex: 1;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+}
+
+.preview-video {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Timeline Area */
+.timeline-area {
+    height: 60px;
+    background: #333;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Footer Toolbar */
+.footer-toolbar {
+    height: 50px;
+    background: #202020;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border: 1px solid #333;
+    border-top: none;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.setting-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #ccc;
+    font-size: 12px;
+}
+
+.setting-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #ccc;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.input-number {
+    width: 50px;
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+/* Segment Editor (Right side of footer) */
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.selected-label {
+    font-weight: bold;
+    color: #e69138;
+    font-size: 12px;
+    margin-right: 5px;
+}
+
+.segment-editor-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.input-coord {
+    width: 60px;
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
+.duration-display {
+    color: #888;
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.no-selection {
+    color: #555;
+    font-size: 12px;
+    font-style: italic;
+}
