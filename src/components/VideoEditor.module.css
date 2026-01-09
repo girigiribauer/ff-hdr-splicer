@@ -1,0 +1,92 @@
+.videoEditorContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: #1e1e1e;
+    color: #eee;
+}
+
+.editorGrid {
+    display: grid;
+    /*
+       Col 1: Controls (93px)
+       Col 2: Split Button (Auto)
+       Col 3: Timeline (1fr)
+       Col 4: Duration (Auto)
+    */
+    grid-template-columns: 93px auto 1fr auto;
+
+    /*
+       Row 1: Play/Time/Seek (20px)
+       Row 2: Fade In (20px)
+       Row 3: Crossfade/Track (20px)
+       Row 4: Segment Editor (Auto)
+    */
+    grid-template-rows: min-content min-content min-content auto;
+    row-gap: 5px;
+    column-gap: 5px;
+
+    /* Merged wrapper styles */
+    width: 100%;
+    margin-top: auto;
+
+    /* Remove strict height assumptions, allow growth */
+    height: auto;
+    min-height: 100px;
+    background: #2b2b2b;
+    border-top: 1px solid #444;
+    padding: 5px;
+    box-sizing: border-box;
+}
+
+.splitControlContainer {
+    grid-area: 2 / 2 / 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.splitBtn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    background: #555555;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.splitBtn:hover {
+    background: #777777;
+}
+
+.splitBtn:active {
+    background: #222;
+}
+
+.splitIcon {
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+}
+
+.segmentEditorContainer {
+    grid-area: 4 / 3 / 5 / 4;
+    display: flex;
+    align-items: center;
+    /* Ensure consistent height to prevent layout shift */
+    height: 28px;
+    min-height: 28px;
+    overflow: hidden;
+}
+
+.noSegmentMessage {
+    color: #555;
+    font-size: 12px;
+}

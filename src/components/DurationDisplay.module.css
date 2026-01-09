@@ -1,0 +1,13 @@
+.container {
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 3px 5px;
+}
+
+.text {
+    font-family: monospace;
+    color: #ffffff;
+    font-size: 10px;
+}

@@ -1,0 +1,53 @@
+.container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.playBtn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: #555555;
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playBtn:hover {
+    background: #777777;
+}
+
+.icon {
+    width: 100%;
+    height: 100%;
+}
+
+.pauseIcon {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+}
+
+.pauseBar {
+    width: 3px;
+    height: 100%;
+    background: #ffffff;
+}
+
+.timeInput {
+    width: 84px;
+    height: 14px;
+    background: #555555;
+    border: none;
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 10px;
+    line-height: 1;
+    border-radius: 2px;
+    padding: 0 4px;
+    text-align: center;
+}

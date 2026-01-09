@@ -1,0 +1,17 @@
+.previewArea {
+    flex: 1;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+}
+
+.video {
+    max-width: 100%;
+    max-height: 100%;
+    outline: none;
+    /* Box shadow or border if needed */
+}

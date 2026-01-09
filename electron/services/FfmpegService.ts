@@ -65,7 +65,7 @@ export async function getVideoMetadata(filePath: string): Promise<any> {
         const child = spawn(ffprobePath, [
             '-v', 'error',
             '-select_streams', 'v:0',
-            '-show_entries', 'stream=color_space,color_transfer,color_primaries',
+            '-show_entries', 'format=size,duration,bit_rate:stream=codec_name,codec_long_name,width,height,pix_fmt,color_space,color_transfer,color_primaries,codec_type',
             '-of', 'json',
             filePath
         ])

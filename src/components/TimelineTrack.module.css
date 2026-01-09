@@ -1,0 +1,108 @@
+.timelineTrackContainer {
+    width: 100%;
+    height: 43px;
+    position: relative;
+    background: #000;
+    padding: 1px;
+}
+
+.rangeSegment {
+    position: absolute;
+    top: 2px;
+    height: 41px;
+    background-color: #333333;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    cursor: grab;
+    box-sizing: border-box;
+    background-image: repeating-linear-gradient(25deg,
+            #111111,
+            #111111 5px,
+            transparent 5px,
+            transparent 10px);
+}
+
+.rangeSegment.selected {
+    background-color: #065EB9;
+    border: 1px solid #065EB9;
+    z-index: 50;
+    background-image: repeating-linear-gradient(25deg,
+            #0D3F72,
+            #0D3F72 5px,
+            transparent 5px,
+            transparent 10px);
+}
+
+.segmentHandle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    z-index: 60;
+    background: transparent;
+}
+
+.segmentHandle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.leftHandle {
+    left: 0;
+}
+
+.rightHandle {
+    right: 0;
+}
+
+.segmentIcon {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    z-index: 55;
+    filter: brightness(0) invert(1);
+    user-select: none;
+}
+
+.bottomLeft {
+    bottom: 2px;
+    left: 2px;
+}
+
+.bottomRight {
+    bottom: 2px;
+    right: 2px;
+}
+
+.bottomLeftCross {
+    bottom: 2px;
+    left: 2px;
+}
+
+.bottomRightCross {
+    bottom: 2px;
+    right: 2px;
+}
+
+.fadeOverlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 40;
+}
+
+.fadeInOverlay {
+    left: 0;
+    width: 40px;
+    background: linear-gradient(to bottom right, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.fadeOutOverlay {
+    right: 0;
+    width: 40px;
+    background: linear-gradient(to bottom left, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+    border-right: 1px solid rgba(255, 255, 255, 0.4);
+}

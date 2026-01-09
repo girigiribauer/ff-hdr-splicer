@@ -1,5 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { Readable } from 'node:stream'
 
 export async function handleMediaRequest(request: Request): Promise<Response> {
     let url = request.url.replace('media://', '')
@@ -28,9 +29,10 @@ export async function handleMediaRequest(request: Request): Promise<Response> {
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
             const chunksize = (end - start) + 1
 
-            const stream = fs.createReadStream(filePath, { start, end })
+            const nodeStream = fs.createReadStream(filePath, { start, end })
+            const webStream = Readable.toWeb(nodeStream)
 
-            return new Response(stream as any, {
+            return new Response(webStream as any, {
                 status: 206,
                 headers: {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -43,7 +45,11 @@ export async function handleMediaRequest(request: Request): Promise<Response> {
             const headers = new Headers()
             headers.set('Content-Length', fileSize.toString())
             headers.set('Content-Type', mimeType)
-            return new Response(fs.createReadStream(filePath) as any, {
+
+            const nodeStream = fs.createReadStream(filePath)
+            const webStream = Readable.toWeb(nodeStream)
+
+            return new Response(webStream as any, {
                 status: 200,
                 headers
             })

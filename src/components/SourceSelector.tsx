@@ -1,4 +1,5 @@
 import { createSignal, Show } from 'solid-js'
+import styles from './SourceSelector.module.css'
 
 interface SourceSelectorProps {
     ffmpegStatus: { version: string; path: string } | null
@@ -10,7 +11,6 @@ interface SourceSelectorProps {
 export function SourceSelector(props: SourceSelectorProps) {
     const [isDragging, setIsDragging] = createSignal<boolean>(false)
 
-    // Handlers
     const handleSelectFile = async () => {
         try {
             const result = await window.ipcRenderer.invoke('show-open-dialog')
@@ -24,7 +24,6 @@ export function SourceSelector(props: SourceSelectorProps) {
         }
     }
 
-    // Drag & Drop Handlers
     const onDragOver = (e: DragEvent) => {
         e.preventDefault()
         setIsDragging(true)
@@ -51,74 +50,37 @@ export function SourceSelector(props: SourceSelectorProps) {
 
     return (
         <div
-            class="source-selector"
+            class={`${styles.container} ${isDragging() ? styles.dragging : ''}`}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             onDrop={onDrop}
-            style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                "flex-direction": 'column',
-                "justify-content": 'center',
-                "align-items": 'center',
-                background: isDragging() ? '#e6f7ff' : '#fafafa',
-                transition: 'background 0.2s'
-            }}
         >
-            <div class="card" style={{
-                width: '100%',
-                "max-width": '500px',
-                padding: '50px',
-                background: 'white',
-                "border-radius": '16px',
-                "box-shadow": '0 10px 30px rgba(0,0,0,0.08)',
-                "text-align": 'center',
-                border: isDragging() ? '2px dashed #007AFF' : '1px solid #eee',
-                display: 'flex',
-                "flex-direction": 'column',
-                "align-items": 'center',
-                gap: '20px'
-            }}>
-                <div style={{ "font-size": '48px', opacity: 0.5 }}>🎬</div>
+            <div class={`${styles.card} ${isDragging() ? styles.cardDragging : ''}`}>
+                <div class={styles.icon}>🎬</div>
 
                 <div>
-                    <h2 style={{ "margin-top": 0, "margin-bottom": '10px', color: '#333' }}>
+                    <h2 class={styles.title}>
                         {isDragging() ? 'Drop Video Here' : 'Select Video Source'}
                     </h2>
-                    <p style={{ margin: 0, color: '#888', "font-size": '14px' }}>
+                    <p class={styles.subtitle}>
                         Supports HDR video files (.mov, .mp4, .mkv)
                     </p>
                 </div>
 
                 <Show when={props.error}>
-                    <div style={{
-                        background: '#FFF2F2',
-                        color: '#D8000C',
-                        padding: '12px',
-                        "border-radius": '8px',
-                        "border": '1px solid #FFD2D2',
-                        "font-size": '14px',
-                        "width": '100%',
-                        "white-space": 'pre-wrap'
-                    }}>
+                    <div class={styles.error}>
                         {props.error}
                     </div>
                 </Show>
 
                 <button
-                    class="btn-primary"
+                    class={styles.button}
                     onClick={handleSelectFile}
-                    style={{
-                        padding: '12px 30px',
-                        "font-size": '16px',
-                        "margin-top": '10px'
-                    }}
                 >
                     Choose File
                 </button>
 
-                <p style={{ "font-size": '12px', color: '#aaa', "margin-top": '20px' }}>
+                <p class={styles.note}>
                     or drag and drop file here
                 </p>
             </div>

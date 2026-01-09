@@ -1,7 +1,8 @@
-import { createSignal, onMount, For, Show } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import './App.css'
 import { SourceSelector } from './components/SourceSelector'
 import { VideoEditor } from './components/VideoEditor'
+import { Footer } from './components/Footer'
 import { validateHDR } from './services/validator'
 
 type Stage = 'SELECT' | 'EDIT'
@@ -14,9 +15,7 @@ function App() {
   // App State
   const [stage, setStage] = createSignal<Stage>('SELECT')
   const [selectedFile, setSelectedFile] = createSignal<string>('')
-
-  // Log Modal State
-  const [showLogs, setShowLogs] = createSignal<boolean>(false)
+  const [fileMetadata, setFileMetadata] = createSignal<any>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`])
 
@@ -25,6 +24,7 @@ function App() {
       const result = await window.ipcRenderer.invoke('check-ffmpeg')
       if (result.error) {
         setError(result.error)
+        setFfmpegStatus(null)
         addLog(`Error: ${result.error}`)
       } else {
         setFfmpegStatus(result)
@@ -32,6 +32,7 @@ function App() {
       }
     } catch (e: any) {
       setError(e.message)
+      setFfmpegStatus(null)
       addLog(`Exception: ${e.message}`)
     }
   }
@@ -67,27 +68,29 @@ function App() {
         return
       }
 
+      // Success
+      setSelectedFile(path)
+      setFileMetadata(probe.metadata)
+      setStage('EDIT')
+      setError('')
+      addLog(`File loaded (HDR Verified): ${path}`)
+
     } catch (e: any) {
       setError(e.message)
       addLog(`Validation Error: ${e.message}`)
       return
     }
-
-    setSelectedFile(path)
-    setStage('EDIT')
-    setError('')
-    addLog(`File loaded (HDR Verified): ${path}`)
   }
 
   const handleBack = () => {
     setStage('SELECT')
     setSelectedFile('')
+    setFileMetadata(null)
     addLog('Unloaded file, returned to selection.')
   }
 
   return (
     <div class="container">
-      {/* Main Content Area */}
       <div class="main-content">
         <Show when={stage() === 'SELECT'}>
           <SourceSelector
@@ -101,6 +104,7 @@ function App() {
         <Show when={stage() === 'EDIT'}>
           <VideoEditor
             filePath={selectedFile()}
+            fileMetadata={fileMetadata()}
             onBack={handleBack}
             addLog={addLog}
             ffmpegStatus={ffmpegStatus()}
@@ -110,43 +114,13 @@ function App() {
         <Show when={error() && stage() !== 'SELECT'}>
           <div style={{ color: 'red', "margin-top": '10px' }}>Error: {error()}</div>
         </Show>
-
-        {/* Log Modal Overlay */}
-        <Show when={showLogs()}>
-          <div class="log-modal">
-            <div class="log-header">
-              <span>Application Logs</span>
-              <button
-                onClick={() => setShowLogs(false)}
-                style={{ background: 'transparent', border: 'none', color: '#aaa', padding: 0, "font-size": '16px' }}
-              >
-                ✕
-              </button>
-            </div>
-            <div class="log-body">
-              <For each={log()}>
-                {(l) => <div class="log-entry">{l}</div>}
-              </For>
-            </div>
-          </div>
-        </Show>
       </div>
 
-      <div class="footer">
-        <div style={{ "margin-right": 'auto', "font-size": '0.8em', color: '#666' }}>
-          <Show when={ffmpegStatus()} fallback="Checking Env...">
-            FFmpeg: {ffmpegStatus()?.version}
-          </Show>
-        </div>
-
-        <button
-          class="btn-secondary"
-          onClick={() => setShowLogs(!showLogs())}
-          style={{ padding: '6px 12px', "font-size": '12px' }}
-        >
-          Log
-        </button>
-      </div>
+      <Footer
+        ffmpegVersion={ffmpegStatus()?.version}
+        hasError={!!error() && !ffmpegStatus()}
+        logs={log()}
+      />
     </div>
   )
 }

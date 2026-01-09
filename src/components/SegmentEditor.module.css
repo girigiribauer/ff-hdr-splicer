@@ -1,0 +1,53 @@
+.container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    background: #2b2b2b;
+    /* Match editor grid bg */
+    border-radius: 3px;
+    color: #eee;
+    font-size: 11px;
+}
+
+.input {
+    width: 60px;
+    height: 14px;
+    background: #555555;
+    border: none;
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 10px;
+    text-align: center;
+    padding: 0;
+    border-radius: 2px;
+}
+
+.separator {
+    color: #777777;
+    font-size: 11px;
+}
+
+.duration {
+    color: #ffffff;
+    font-size: 11px;
+    margin-left: 2px;
+}
+
+.deleteBtn {
+    background: #cc4444;
+    color: #ffffff;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 10px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.deleteBtn:hover {
+    background: #e04444;
+}

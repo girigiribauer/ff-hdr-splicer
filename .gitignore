@@ -24,3 +24,6 @@ dist-electron
 *.sw?
 output/
 release/
+
+*storybook.log
+storybook-static

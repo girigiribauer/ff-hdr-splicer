@@ -1,11 +1,20 @@
-import { createSignal, onMount, onCleanup } from 'solid-js'
-import { RangeSlider } from './ui/RangeSlider'
-import './VideoEditor.css'
+import { createSignal, onMount, onCleanup, Show } from 'solid-js'
+import { SeekBar } from './SeekBar'
+import { TimelineTrack } from './TimelineTrack'
 import { Segment } from '../models/Segment'
 import { createSegmentSpecs, getNextSelectedId } from '../services/timeline'
+import { EditorHeader } from './EditorHeader'
+import { VideoPreview } from './VideoPreview'
+import { PlayControls } from './PlayControls'
+import { FadeInControl } from './FadeInControl'
+import { CrossFadeControl } from './CrossFadeControl'
+import { SegmentEditor } from './SegmentEditor'
+import { DurationDisplay } from './DurationDisplay'
+import styles from './VideoEditor.module.css'
 
 interface VideoEditorProps {
     filePath: string
+    fileMetadata: any
     onBack: () => void
     addLog: (msg: string) => void
     ffmpegStatus: { version: string; path: string } | null
@@ -21,23 +30,23 @@ export function VideoEditor(props: VideoEditorProps) {
 
     // Fade Options
     const [fadeOptions, setFadeOptions] = createSignal({
-        crossfade: true,
-        fadeDuration: 2.0,
-        crossfadeDuration: 1.0
+        fadeInOut: true,
+        crossfade: false,
+        fadeDuration: 1.5,
+        crossfadeDuration: 0.5
     })
 
-    // Media protocol (See main.ts)
+    // Media protocol
     const getMediaUrl = (path: string) => `media://${path}`
 
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
         if (isFinite(vid.duration)) {
             setDuration(vid.duration)
-            // Default: Select Initial 10% - 30%
             if (segments().length === 0) {
                 const newId = crypto.randomUUID()
-                const start = Math.max(vid.duration * 0.1, 0)
-                const end = Math.min(vid.duration * 0.3, vid.duration)
+                const start = 0
+                const end = vid.duration
                 setSegments([{ id: newId, start, end }])
                 setSelectedSegmentId(newId)
             }
@@ -54,23 +63,13 @@ export function VideoEditor(props: VideoEditorProps) {
         }
     }
 
-    const handlePlay = () => {
-        loop()
-    }
+    const handlePlay = () => loop()
+    const handlePause = () => cancelAnimationFrame(animationFrameId)
 
-    const handlePause = () => {
-        cancelAnimationFrame(animationFrameId)
-    }
-
-    onCleanup(() => {
-        cancelAnimationFrame(animationFrameId)
-    })
+    onCleanup(() => cancelAnimationFrame(animationFrameId))
 
     const handleTimeUpdate = (e: Event) => {
         const vid = e.target as HTMLVideoElement
-        // Only update if not playing to avoid conflict/double updates,
-        // though Solid's batching usually handles it.
-        // But mainly we trust rAF during playback.
         if (vid.paused) {
             setCurrentTime(vid.currentTime)
         }
@@ -100,7 +99,6 @@ export function VideoEditor(props: VideoEditorProps) {
 
     const handleRemoveSegment = (id: string) => {
         const nextSelectedId = getNextSelectedId(segments(), id)
-
         setSegments(prev => prev.filter(s => s.id !== id))
         if (selectedSegmentId() === id) {
             setSelectedSegmentId(nextSelectedId)
@@ -130,7 +128,11 @@ export function VideoEditor(props: VideoEditorProps) {
                 filePath: props.filePath,
                 segments: exportSegments,
                 outputFilePath: outPath,
-                fadeOptions: fadeOptions()
+                fadeOptions: {
+                    crossfade: fadeOptions().crossfade,
+                    fadeDuration: fadeOptions().fadeInOut ? fadeOptions().fadeDuration : 0,
+                    crossfadeDuration: fadeOptions().crossfade ? fadeOptions().crossfadeDuration : 0
+                }
             })
 
             if (result.success) {
@@ -138,8 +140,6 @@ export function VideoEditor(props: VideoEditorProps) {
             } else {
                 props.addLog(`Failed: ${result.error}`)
                 if (result.stderr) {
-                    console.error(result.stderr)
-                    // Extract last few lines of stderr for UI log
                     const lines = result.stderr.split('\n')
                     const lastLines = lines.slice(-5).join('\n')
                     props.addLog(`FFmpeg Error Details:\n${lastLines}`)
@@ -152,12 +152,34 @@ export function VideoEditor(props: VideoEditorProps) {
         }
     }
 
-    // Shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-        // Prevent shortcuts when typing in inputs
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-            return
+    const handleSplitOrAddSegment = () => {
+        const time = currentTime()
+        const currentSeg = segments().find(s => time > s.start && time < s.end)
+
+        if (currentSeg) {
+            const newId1 = crypto.randomUUID()
+            const newId2 = crypto.randomUUID()
+            const seg1: Segment = { id: newId1, start: currentSeg.start, end: time }
+            const seg2: Segment = { id: newId2, start: time, end: currentSeg.end }
+
+            setSegments(prev => {
+                const filtered = prev.filter(s => s.id !== currentSeg.id)
+                return [...filtered, seg1, seg2]
+            })
+            setSelectedSegmentId(newId2)
+            props.addLog(`Split segment at ${time.toFixed(3)}s`)
+        } else {
+            const newId = handleAddSegment(time)
+            if (newId) {
+                props.addLog(`Added segment at ${time.toFixed(3)}s`)
+            } else {
+                props.addLog('Could not add segment (Overlap or too short)')
+            }
         }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
         if (e.code === 'Space') {
             e.preventDefault()
@@ -167,166 +189,122 @@ export function VideoEditor(props: VideoEditorProps) {
         if (e.code === 'Backspace' || e.code === 'Delete') {
             if (selectedSegmentId()) handleRemoveSegment(selectedSegmentId()!)
         }
+        if (e.code === 'KeyS') {
+            e.preventDefault()
+            handleSplitOrAddSegment()
+        }
     }
 
-    onMount(() => {
-        window.addEventListener('keydown', handleKeyDown)
-    })
-    onCleanup(() => {
-        window.removeEventListener('keydown', handleKeyDown)
-    })
+    onMount(() => window.addEventListener('keydown', handleKeyDown))
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown))
+
+    // Determine current segment for editor
+    const currentSegment = () => segments().find(s => s.id === selectedSegmentId())
 
     return (
-        <div class="video-editor-container">
-            <div class="video-editor-header">
-                <div class="header-left">
-                    <button
-                        onClick={props.onBack}
-                        title="Close File"
-                        class="close-btn"
-                    >
-                        ✕
-                    </button>
-                    <span class="file-name">
-                        {props.filePath.split(/[\\/]/).pop()}
-                    </span>
-                </div>
+        <div class={styles.videoEditorContainer}>
+            <EditorHeader
+                filePath={props.filePath}
+                fileMetadata={props.fileMetadata}
+                isExporting={bussy()}
+                onBack={props.onBack}
+                onExport={handleExport}
+            />
 
-                <button
-                    class="btn-primary btn-export"
-                    onClick={handleExport}
-                    disabled={bussy()}
-                >
-                    {bussy() ? 'Exporting...' : 'Export'}
-                </button>
-            </div>
-
-            <div
-                class="video-preview-area"
+            <VideoPreview
+                src={getMediaUrl(props.filePath)}
+                videoRef={setVideoRef}
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+                onPlay={handlePlay}
+                onPause={handlePause}
                 onClick={() => {
                     const v = videoRef()
                     if (v) v.paused ? v.play() : v.pause()
                 }}
-            >
-                <video
-                    ref={setVideoRef}
-                    src={getMediaUrl(props.filePath)}
-                    class="preview-video"
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onTimeUpdate={handleTimeUpdate}
-                    onPlay={handlePlay}
-                    onPause={handlePause}
-                    onError={(e) => {
-                        const vid = e.target as HTMLVideoElement
-                        const err = vid.error
-                        props.addLog(`Video Error: ${err ? err.message : 'Unknown error'} (Code: ${err ? err.code : 'N/A'})`)
-                        props.addLog(`Src: ${vid.src}`)
-                        console.error('Video Error:', err)
-                    }}
-                />
-            </div>
+            />
 
-            <div class="timeline-area">
-                <RangeSlider
-                    min={0}
-                    max={duration()}
-                    currentTime={currentTime()}
-                    segments={segments()}
-                    onChange={handleSegmentChange}
-                    onSeek={handleSeek}
-                    onSelectSegment={setSelectedSegmentId}
-                    onAddSegment={handleAddSegment}
-                    onRemoveSegment={handleRemoveSegment}
-                    selectedSegmentId={selectedSegmentId()}
-                    videoFadeDuration={fadeOptions().fadeDuration}
-                />
-            </div>
-
-            <div class="footer-toolbar">
-                <div class="footer-left">
-                    <label class="setting-label">
-                        <input
-                            type="checkbox"
-                            checked={fadeOptions().crossfade}
-                            onChange={(e) => setFadeOptions(prev => ({ ...prev, crossfade: e.currentTarget.checked }))}
-                        />
-                        Enable Transitions
-                    </label>
-
-                    <div class="setting-group">
-                        <span>Fade In/Out:</span>
-                        <input
-                            type="number"
-                            min="0"
-                            max="5.0"
-                            step="0.1"
-                            value={fadeOptions().fadeDuration}
-                            onChange={(e) => setFadeOptions(prev => ({ ...prev, fadeDuration: parseFloat(e.currentTarget.value) }))}
-                            class="input-number"
-                        />
-                        <span>s</span>
-                    </div>
-
-                    <div class="setting-group">
-                        <span>Join Crossfade:</span>
-                        <input
-                            type="number"
-                            min="0"
-                            max="5.0"
-                            step="0.1"
-                            value={fadeOptions().crossfadeDuration}
-                            onChange={(e) => setFadeOptions(prev => ({ ...prev, crossfadeDuration: parseFloat(e.currentTarget.value) }))}
-                            class="input-number"
-                        />
-                        <span>s</span>
-                    </div>
+            <div class={styles.editorGrid}>
+                <div style={{ "grid-area": "1 / 1 / 2 / 3" }}>
+                    <PlayControls
+                        isPlaying={!videoRef()?.paused}
+                        onTogglePlay={() => { const v = videoRef(); if (v) v.paused ? v.play() : v.pause() }}
+                        currentTime={currentTime()}
+                        onTimeChange={handleSeek}
+                    />
                 </div>
 
-                <div class="footer-right">
-                    {selectedSegmentId() !== null ? (() => {
-                        const seg = segments().find(s => s.id === selectedSegmentId())
-                        if (!seg) return <span class="no-selection">Segment not found</span>
-                        return (
-                            <>
-                                <span class="selected-label">Selected:</span>
-                                <div class="segment-editor-group">
-                                    <label>Start:</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={seg.start.toFixed(3)}
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.currentTarget.value)
-                                            if (!isNaN(val) && val >= 0 && val < seg.end) {
-                                                setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, start: val } : s))
-                                            }
-                                        }}
-                                        class="input-coord"
-                                    />
-                                </div>
-                                <div class="segment-editor-group">
-                                    <label>End:</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={seg.end.toFixed(3)}
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.currentTarget.value)
-                                            if (!isNaN(val) && val > seg.start) {
-                                                setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, end: val } : s))
-                                            }
-                                        }}
-                                        class="input-coord"
-                                    />
-                                </div>
-                                <div class="duration-display">
-                                    ({(seg.end - seg.start).toFixed(2)}s)
-                                </div>
-                            </>
-                        )
-                    })() : (
-                        <span class="no-selection">Select a segment to edit</span>
-                    )}
+                <div style={{ "grid-area": "1 / 3 / 2 / 4" }}>
+                    <SeekBar
+                        min={0}
+                        max={duration()}
+                        currentTime={currentTime()}
+                        onSeek={handleSeek}
+                    />
+                </div>
+
+                <div style={{ "grid-area": "1 / 4 / 2 / 5" }}>
+                    <DurationDisplay duration={duration()} />
+                </div>
+
+                <div style={{ "grid-area": "2 / 1 / 3 / 2" }}>
+                    <FadeInControl
+                        active={fadeOptions().fadeInOut}
+                        duration={fadeOptions().fadeDuration}
+                        onToggle={() => setFadeOptions(p => ({ ...p, fadeInOut: !p.fadeInOut }))}
+                        onDurationChange={(d) => setFadeOptions(p => ({ ...p, fadeDuration: d }))}
+                    />
+                </div>
+
+                <div style={{ "grid-area": "3 / 1 / 4 / 2" }}>
+                    <CrossFadeControl
+                        active={fadeOptions().crossfade}
+                        duration={fadeOptions().crossfadeDuration}
+                        onToggle={() => setFadeOptions(p => ({ ...p, crossfade: !p.crossfade }))}
+                        onDurationChange={(d) => setFadeOptions(p => ({ ...p, crossfadeDuration: d }))}
+                    />
+                </div>
+
+                <div class={styles.splitControlContainer}>
+                    <button
+                        class={styles.splitBtn}
+                        onClick={handleSplitOrAddSegment}
+                        title="Split Segment at Playhead"
+                    >
+                        <img src="/addSegment.svg" class={styles.splitIcon} />
+                    </button>
+                </div>
+
+                <div style={{ "grid-area": "2 / 3 / 4 / 4", "position": "relative" }}>
+                    <TimelineTrack
+                        min={0}
+                        max={duration()}
+                        segments={segments()}
+                        selectedSegmentId={selectedSegmentId()}
+                        enableFadeIn={fadeOptions().fadeInOut}
+                        enableFadeOut={fadeOptions().fadeInOut}
+                        enableCrossfade={fadeOptions().crossfade}
+                        onChange={handleSegmentChange}
+                        onSelectSegment={setSelectedSegmentId}
+                        onAddSegment={handleAddSegment}
+                        onRemoveSegment={handleRemoveSegment}
+                    />
+                </div>
+
+                <div class={styles.segmentEditorContainer}>
+                    <Show when={currentSegment()} fallback={<div class={styles.noSegmentMessage}>No segment selected</div>}>
+                        <SegmentEditor
+                            segment={currentSegment()!}
+                            onUpdate={(start, end) => {
+                                const seg = currentSegment()
+                                if (seg) handleSegmentChange(seg.id, start, end)
+                            }}
+                            onDelete={() => {
+                                const seg = currentSegment()
+                                if (seg) handleRemoveSegment(seg.id)
+                            }}
+                        />
+                    </Show>
                 </div>
             </div>
         </div>

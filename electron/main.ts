@@ -132,6 +132,17 @@ app.whenReady().then(() => {
     return result
   })
 
+  ipcMain.handle('show-info-dialog', async (_event, title, content) => {
+    const { dialog } = await import('electron')
+    return await dialog.showMessageBox({
+      type: 'info',
+      title: title,
+      message: title,
+      detail: content,
+      buttons: ['OK']
+    })
+  })
+
   ipcMain.handle('show-save-dialog', async (_event, defaultName) => {
     const { dialog } = await import('electron')
     const result = await dialog.showSaveDialog({

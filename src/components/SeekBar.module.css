@@ -1,0 +1,55 @@
+.seekBarContainer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    /* Aligns to Grid Cell */
+}
+
+.seekTrackLine {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #666;
+    transform: translateY(-50%);
+    transition: height 0.1s;
+}
+
+.seekPlayheadKnob {
+    position: absolute;
+    top: calc(50% - 5px);
+    width: 12px;
+    height: 9px;
+    background-color: #ff0000;
+
+    clip-path: polygon(0% 0%, 100% 0%, 100% 30%, 50% 100%, 0% 30%);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    z-index: 101;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+}
+
+.seekPlayheadKnob::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    /* Start at bottom of knob */
+    left: 50%;
+    width: 1px;
+    height: 200px;
+    /* Fixed large height to extend down */
+    background-color: #fff;
+    /* White line */
+    transform: translateX(-50%);
+    pointer-events: none;
+    /* No click area */
+    opacity: 0.5;
+}
+
+.seekPlayheadKnob:active {
+    cursor: grabbing;
+    transform: translate(-50%, -50%) scale(1.2);
+}
