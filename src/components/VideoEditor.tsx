@@ -307,6 +307,13 @@ export function VideoEditor(props: VideoEditorProps) {
                     </Show>
                 </div>
             </div>
-        </div>
+
+            <Show when={bussy()}>
+                <div class={styles.overlay}>
+                    <div class={styles.spinner}></div>
+                    <div>Exporting...</div>
+                </div>
+            </Show>
+        </div >
     )
 }

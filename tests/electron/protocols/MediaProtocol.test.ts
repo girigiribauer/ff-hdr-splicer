@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handleMediaRequest } from '../../../electron/protocols/MediaProtocol'
 import fs from 'node:fs'
+import { Readable } from 'node:stream'
 
 // Mock fs and fs.promises
 vi.mock('node:fs', () => ({
@@ -18,10 +19,8 @@ describe('MediaProtocol', () => {
     })
 
     it('通常リクエストでファイル全体を返すべき (200 OK)', async () => {
-        // Mock file stats
         vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1000 } as any)
-        // Mock stream (dummy)
-        const mockStream = { pipe: vi.fn() }
+        const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
         const request = new Request('media://Users/test/video.mp4')
@@ -34,7 +33,8 @@ describe('MediaProtocol', () => {
 
     it('Rangeリクエストで部分データを返すべき (206 Partial Content)', async () => {
         vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1000 } as any)
-        vi.spyOn(fs, 'createReadStream').mockReturnValue({ pipe: vi.fn() } as any)
+        const mockStream = Readable.from(Buffer.from('dummy data'))
+        vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
         const request = new Request('media://Users/test/video.mov', {
             headers: { 'Range': 'bytes=0-499' }
@@ -54,5 +54,18 @@ describe('MediaProtocol', () => {
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(404)
+    })
+
+    it('日本語ファイル名（URLエンコード）を正しくデコードして開くべき', async () => {
+        vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1000 } as any)
+        const mockStream = Readable.from(Buffer.from('dummy data'))
+        vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
+
+        // media://Users/test/%E5%8B%95%E7%94%BB.mp4 -> /Users/test/動画.mp4
+        const request = new Request('media://Users/test/%E5%8B%95%E7%94%BB.mp4')
+        const response = await handleMediaRequest(request)
+
+        expect(response.status).toBe(200)
+        expect(fs.createReadStream).toHaveBeenCalledWith('/Users/test/動画.mp4')
     })
 })

@@ -19,7 +19,13 @@ interface TimelineTrackProps {
 
 export function TimelineTrack(props: TimelineTrackProps) {
     let trackRef: HTMLDivElement | undefined
-    const [dragState, setDragState] = createSignal<{ type: 'start' | 'end' | 'move', targetId: string, isCreating?: boolean, startOffset?: number } | null>(null)
+    const [dragState, setDragState] = createSignal<{
+        type: 'start' | 'end' | 'move',
+        targetId: string,
+        isCreating?: boolean,
+        startOffset?: number,
+        originTime?: number
+    } | null>(null)
 
     const getPercent = (value: number) => {
         if (props.max - props.min === 0) return 0
@@ -36,7 +42,7 @@ export function TimelineTrack(props: TimelineTrackProps) {
         const time = getTimeFromX(e.clientX, trackRef.getBoundingClientRect())
         const newId = props.onAddSegment(time, 0)
         if (newId) {
-            setDragState({ type: 'end', targetId: newId, isCreating: true })
+            setDragState({ type: 'end', targetId: newId, isCreating: true, originTime: time })
         }
     }
 
@@ -73,10 +79,26 @@ export function TimelineTrack(props: TimelineTrackProps) {
             const { start } = resizeSegment(props.segments, seg.id, time, seg.end, props.max)
             if (start !== seg.start) props.onChange(seg.id, start, seg.end)
         } else if (type === 'end') {
-            let targetEnd = time
-            if (isCreating && targetEnd < seg.start) targetEnd = seg.start
-            const { end } = resizeSegment(props.segments, seg.id, seg.start, targetEnd, props.max)
-            if (end !== seg.end) props.onChange(seg.id, seg.start, end)
+            if (isCreating && dragState()?.originTime !== undefined) {
+                const origin = dragState()!.originTime!
+                // Bi-directional creation logic
+                const rawStart = Math.min(origin, time)
+                const rawEnd = Math.max(origin, time)
+
+                // Validate constraints using resizeSegment
+                const { start, end } = resizeSegment(props.segments, seg.id, rawStart, rawEnd, props.max)
+
+                if (start !== seg.start || end !== seg.end) {
+                    props.onChange(seg.id, start, end)
+                }
+            } else {
+                // Normal resizing logic (end handle only)
+                let targetEnd = time
+                // Prevent dragging end handle before start
+                if (targetEnd < seg.start) targetEnd = seg.start
+                const { end } = resizeSegment(props.segments, seg.id, seg.start, targetEnd, props.max)
+                if (end !== seg.end) props.onChange(seg.id, seg.start, end)
+            }
         } else if (type === 'move') {
             const duration = seg.end - seg.start
             // Use offset if available, otherwise fallback to center (though offset should always be set for move)

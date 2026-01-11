@@ -31,7 +31,7 @@
     height: 300px;
     background-color: rgba(30, 30, 30, 0.75);
     color: #ffffff;
-    z-index: 100;
+    z-index: 10000;
     display: flex;
     flex-direction: column;
     text-align: left;
