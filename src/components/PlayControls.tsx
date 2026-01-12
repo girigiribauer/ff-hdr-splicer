@@ -19,7 +19,7 @@ export const PlayControls: Component<PlayControlsProps> = (props) => {
                 onClick={props.onTogglePlay}
                 title={props.isPlaying ? "Pause" : "Play"}
             >
-                <Show when={props.isPlaying} fallback={<img src="/play.svg" class={styles.icon} />}>
+                <Show when={props.isPlaying} fallback={<img src="play.svg" class={styles.icon} />}>
                     <div class={styles.pauseIcon}>
                         <div class={styles.pauseBar}></div>
                         <div class={styles.pauseBar}></div>

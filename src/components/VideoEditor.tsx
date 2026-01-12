@@ -271,7 +271,7 @@ export function VideoEditor(props: VideoEditorProps) {
                         onClick={handleSplitOrAddSegment}
                         title="Split Segment at Playhead"
                     >
-                        <img src="/addSegment.svg" class={styles.splitIcon} />
+                        <img src="addSegment.svg" class={styles.splitIcon} />
                     </button>
                 </div>
 

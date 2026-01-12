@@ -15,7 +15,7 @@ export const CrossFadeControl: Component<{
                 onClick={props.onToggle}
                 title="Toggle Crossfade"
             >
-                <img src="/crossFade.svg" class={styles.icon} />
+                <img src="crossFade.svg" class={styles.icon} />
             </button>
             <input
                 type="text"

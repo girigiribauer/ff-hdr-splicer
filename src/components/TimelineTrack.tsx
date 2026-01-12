@@ -179,22 +179,22 @@ export function TimelineTrack(props: TimelineTrackProps) {
                             <Show when={isFirst()}>
                                 <Show when={props.enableFadeIn}>
                                     <div class={`${styles.fadeOverlay} ${styles.fadeInOverlay}`} />
-                                    <img src="/fadeInOut.svg" class={`${styles.segmentIcon} ${styles.bottomLeft}`} alt="Fade In" />
+                                    <img src="fadeInOut.svg" class={`${styles.segmentIcon} ${styles.bottomLeft}`} alt="Fade In" />
                                 </Show>
                             </Show>
                             <Show when={!isFirst() && props.enableCrossfade}>
-                                <img src="/crossFade.svg" class={`${styles.segmentIcon} ${styles.bottomLeftCross}`} alt="Crossfade Start" />
+                                <img src="crossFade.svg" class={`${styles.segmentIcon} ${styles.bottomLeftCross}`} alt="Crossfade Start" />
                             </Show>
 
                             {/* End Icon: FadeOut (Last) OR Crossfade (Not Last) */}
                             <Show when={isLast()}>
                                 <Show when={props.enableFadeOut}>
                                     <div class={`${styles.fadeOverlay} ${styles.fadeOutOverlay}`} />
-                                    <img src="/fadeInOut.svg" class={`${styles.segmentIcon} ${styles.bottomRight}`} alt="Fade Out" />
+                                    <img src="fadeInOut.svg" class={`${styles.segmentIcon} ${styles.bottomRight}`} alt="Fade Out" />
                                 </Show>
                             </Show>
                             <Show when={!isLast() && props.enableCrossfade}>
-                                <img src="/crossFade.svg" class={`${styles.segmentIcon} ${styles.bottomRightCross}`} alt="Crossfade End" />
+                                <img src="crossFade.svg" class={`${styles.segmentIcon} ${styles.bottomRightCross}`} alt="Crossfade End" />
                             </Show>
 
                             <div class={`${styles.segmentHandle} ${styles.leftHandle}`} onMouseDown={(e) => handleHandleMouseDown(e, 'start', segment.id)} />

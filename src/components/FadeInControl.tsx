@@ -15,7 +15,7 @@ export const FadeInControl: Component<{
                 onClick={props.onToggle}
                 title="Toggle Fade In/Out"
             >
-                <img src="/fadeInOut.svg" class={styles.icon} />
+                <img src="fadeInOut.svg" class={styles.icon} />
             </button>
             <input
                 type="text"
