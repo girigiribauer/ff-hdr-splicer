@@ -62,7 +62,7 @@
     ],
     "mac": {
       "target": "dmg",
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": true,
       "gatekeeperAssess": false
     },
