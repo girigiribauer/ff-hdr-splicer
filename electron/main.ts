@@ -42,7 +42,7 @@ function createWindow() {
   })
 
   // Block sensitive permissions
-  win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+  win.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
     const allowedPermissions = ['media'] // Add any required permissions here
     if (allowedPermissions.includes(permission)) {
       callback(true)
