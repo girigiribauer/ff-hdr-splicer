@@ -51,7 +51,16 @@ export async function getDuration(filePath: string): Promise<number> {
             let out = ''
             child.stdout.on('data', (d) => (out += d.toString()))
             child.on('close', (code) => {
-                if (code === 0) resolve(parseFloat(out.trim()))
+                if (code === 0) {
+                    const cleanOut = out.trim()
+                    // Handle potential comma decimals (European locales)
+                    const duration = parseFloat(cleanOut.replace(',', '.'))
+                    if (isNaN(duration)) {
+                        reject(new Error(`Parsed duration is NaN. Output: ${cleanOut}`))
+                    } else {
+                        resolve(duration)
+                    }
+                }
                 else reject(new Error(`Probe failed with code ${code}`))
             })
             child.on('error', (err) => reject(err))
@@ -95,7 +104,8 @@ export async function spliceSegments(
     filePath: string,
     segments: { start: number; end: number }[],
     outPath: string,
-    fadeOptions?: { crossfade: boolean; fadeDuration: number; crossfadeDuration: number }
+    fadeOptions?: { crossfade: boolean; fadeDuration: number; crossfadeDuration: number },
+    onProgress?: (percent: number) => void
 ): Promise<{ success?: boolean; outPath?: string; error?: string; stderr?: string }> {
     if (segments.length === 0) return { error: 'No segments provided' }
 
@@ -113,6 +123,14 @@ export async function spliceSegments(
     const videoDur = fadeOptions?.fadeDuration || 1.0
     const xDur = fadeOptions?.crossfadeDuration || 1.0
     const enableCrossfade = fadeOptions?.crossfade ?? false
+
+    let progressTotalDuration = 0
+    if (enableCrossfade && segments.length > 1) {
+        progressTotalDuration = segments.reduce((acc, s) => acc + (s.end - s.start), 0) - ((segments.length - 1) * xDur)
+    } else {
+        progressTotalDuration = segments.reduce((acc, s) => acc + (s.end - s.start), 0)
+    }
+    if (progressTotalDuration <= 0) progressTotalDuration = 1
 
     if (enableCrossfade && segments.length > 1) {
         let currentOffset = 0
@@ -209,10 +227,95 @@ export async function spliceSegments(
     return new Promise((resolve) => {
         const child = spawn(ffmpegPath, cmdArgs)
         let stderr = ''
-        child.stderr.on('data', (d) => (stderr += d.toString()))
+        child.stderr.on('data', (d) => {
+            stderr += d.toString()
+            if (onProgress) {
+                const s = d.toString()
+                const match = s.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/)
+                if (match) {
+                    const sec = parseTimeStr(match[1])
+                    const p = Math.min(100, Math.round((sec / progressTotalDuration) * 100))
+                    onProgress(p)
+                }
+            }
+        })
         child.on('close', (code) => {
             if (code === 0) resolve({ success: true, outPath })
             else resolve({ error: `FFmpeg splice failed code ${code}`, stderr })
         })
+    })
+}
+
+function parseTimeStr(timeStr: string): number {
+    const parts = timeStr.split(':')
+    if (parts.length < 3) return 0
+    const h = parseFloat(parts[0])
+    const m = parseFloat(parts[1])
+    const s = parseFloat(parts[2])
+    return (h * 3600) + (m * 60) + s
+}
+
+export async function generateProxy(
+    filePath: string,
+    onProgress?: (percent: number) => void
+): Promise<{ success: boolean; proxyPath?: string; error?: string }> {
+    const ffmpegPath = getFFmpegPath()
+    const path = await import('node:path')
+    const os = await import('node:os')
+    const fs = await import('node:fs')
+
+    // Create temp directory for proxies if not exists
+    const tempDir = path.join(os.tmpdir(), 'ff-hdr-splicer-proxies')
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+    }
+
+    const filename = path.basename(filePath)
+    const proxyPath = path.join(tempDir, `proxy_${filename}_${Date.now()}.mp4`)
+
+    // Get duration for progress
+    let duration = 0
+    try {
+        const meta = await getVideoMetadata(filePath)
+        if (meta && meta.format && meta.format.duration) {
+            duration = parseFloat(meta.format.duration)
+        }
+    } catch (e) {
+        // ignore
+    }
+
+    // Fast H.264 proxy (480p height)
+    const args = [
+        '-y',
+        '-i', filePath,
+        '-vf', 'scale=-1:480',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '30',
+        '-c:a', 'aac',
+        '-ac', '2',
+        proxyPath
+    ]
+
+    return new Promise((resolve) => {
+        const child = spawn(ffmpegPath, args)
+
+        if (onProgress && duration > 0) {
+            child.stderr.on('data', (d) => {
+                const s = d.toString()
+                const match = s.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/)
+                if (match) {
+                    const sec = parseTimeStr(match[1])
+                    const p = Math.min(100, Math.round((sec / duration) * 100))
+                    onProgress(p)
+                }
+            })
+        }
+
+        child.on('close', (code) => {
+            if (code === 0) resolve({ success: true, proxyPath })
+            else resolve({ success: false, error: `Proxy generation failed with code ${code}` })
+        })
+        child.on('error', (err) => resolve({ success: false, error: err.message }))
     })
 }

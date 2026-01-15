@@ -10,6 +10,9 @@ import { FadeInControl } from './FadeInControl'
 import { CrossFadeControl } from './CrossFadeControl'
 import { SegmentEditor } from './SegmentEditor'
 import { DurationDisplay } from './DurationDisplay'
+import { ProgressOverlay } from './ProgressOverlay'
+import { useProxyGenerator } from '../hooks/useProxyGenerator'
+import { useVideoExport } from '../hooks/useVideoExport'
 import styles from './VideoEditor.module.css'
 
 interface VideoEditorProps {
@@ -25,7 +28,6 @@ export function VideoEditor(props: VideoEditorProps) {
     const [currentTime, setCurrentTime] = createSignal<number>(0)
     const [segments, setSegments] = createSignal<Segment[]>([])
     const [selectedSegmentId, setSelectedSegmentId] = createSignal<string | null>(null)
-    const [bussy, setBussy] = createSignal<boolean>(false)
     const [videoRef, setVideoRef] = createSignal<HTMLVideoElement | undefined>(undefined)
 
     // Fade Options
@@ -36,8 +38,16 @@ export function VideoEditor(props: VideoEditorProps) {
         crossfadeDuration: 0.5
     })
 
-    // Media protocol
-    const getMediaUrl = (path: string) => `media://${path}`
+    // Custom Hooks
+    const { proxyPath, isMakingProxy, proxyProgress } = useProxyGenerator(
+        () => props.filePath,
+        props.addLog
+    )
+
+    const { isExporting, exportProgress, startExport } = useVideoExport(props.addLog)
+
+    // Media protocol (Use proxy if available)
+    const getMediaUrl = (path: string) => `media://${proxyPath() || path}`
 
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
@@ -65,7 +75,6 @@ export function VideoEditor(props: VideoEditorProps) {
 
     const handlePlay = () => loop()
     const handlePause = () => cancelAnimationFrame(animationFrameId)
-
     onCleanup(() => cancelAnimationFrame(animationFrameId))
 
     const handleTimeUpdate = (e: Event) => {
@@ -102,53 +111,6 @@ export function VideoEditor(props: VideoEditorProps) {
         setSegments(prev => prev.filter(s => s.id !== id))
         if (selectedSegmentId() === id) {
             setSelectedSegmentId(nextSelectedId)
-        }
-    }
-
-    const handleExport = async () => {
-        if (bussy()) return
-        try {
-            const currentSegments = [...segments()].sort((a, b) => a.start - b.start)
-            if (currentSegments.length === 0) {
-                props.addLog('Error: No segments to export')
-                return
-            }
-
-            const defaultName = props.filePath.split(/[\\/]/).pop()?.replace(/\.[^/.]+$/, "") + '_cut.mov'
-            const saveResult = await window.ipcRenderer.invoke('show-save-dialog', defaultName)
-            if (saveResult.canceled || !saveResult.filePath) return
-
-            setBussy(true)
-            const outPath = saveResult.filePath
-            props.addLog(`Exporting ${currentSegments.length} segments to ${outPath}`)
-
-            const exportSegments = currentSegments.map(s => ({ start: s.start, end: s.end }))
-
-            const result = await window.ipcRenderer.invoke('run-test-splice', {
-                filePath: props.filePath,
-                segments: exportSegments,
-                outputFilePath: outPath,
-                fadeOptions: {
-                    crossfade: fadeOptions().crossfade,
-                    fadeDuration: fadeOptions().fadeInOut ? fadeOptions().fadeDuration : 0,
-                    crossfadeDuration: fadeOptions().crossfade ? fadeOptions().crossfadeDuration : 0
-                }
-            })
-
-            if (result.success) {
-                props.addLog(`Success: ${result.outPath}`)
-            } else {
-                props.addLog(`Failed: ${result.error}`)
-                if (result.stderr) {
-                    const lines = result.stderr.split('\n')
-                    const lastLines = lines.slice(-5).join('\n')
-                    props.addLog(`FFmpeg Error Details:\n${lastLines}`)
-                }
-            }
-        } catch (e: any) {
-            props.addLog(`Error: ${e.message}`)
-        } finally {
-            setBussy(false)
         }
     }
 
@@ -195,8 +157,12 @@ export function VideoEditor(props: VideoEditorProps) {
         }
     }
 
-    onMount(() => window.addEventListener('keydown', handleKeyDown))
-    onCleanup(() => window.removeEventListener('keydown', handleKeyDown))
+    onMount(() => {
+        window.addEventListener('keydown', handleKeyDown)
+        onCleanup(() => {
+            window.removeEventListener('keydown', handleKeyDown)
+        })
+    })
 
     // Determine current segment for editor
     const currentSegment = () => segments().find(s => s.id === selectedSegmentId())
@@ -206,9 +172,9 @@ export function VideoEditor(props: VideoEditorProps) {
             <EditorHeader
                 filePath={props.filePath}
                 fileMetadata={props.fileMetadata}
-                isExporting={bussy()}
+                isExporting={isExporting()}
                 onBack={props.onBack}
-                onExport={handleExport}
+                onExport={() => startExport(props.filePath, segments(), fadeOptions())}
             />
 
             <VideoPreview
@@ -308,12 +274,20 @@ export function VideoEditor(props: VideoEditorProps) {
                 </div>
             </div>
 
-            <Show when={bussy()}>
-                <div class={styles.overlay}>
-                    <div class={styles.spinner}></div>
-                    <div>Exporting...</div>
-                </div>
-            </Show>
+            <ProgressOverlay
+                isVisible={isExporting()}
+                message="Exporting..."
+                progress={exportProgress()}
+                color="green"
+            />
+
+            <ProgressOverlay
+                isVisible={isMakingProxy()}
+                message="Generating Preview Proxy..."
+                subMessage="(Optimization for smooth playback)"
+                progress={proxyProgress()}
+                color="blue"
+            />
         </div >
     )
 }

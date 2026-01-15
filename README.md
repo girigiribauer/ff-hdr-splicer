@@ -1,13 +1,42 @@
 # FF HDR Splicer
 
 ffmpeg を内部で利用して、HDR動画（HT.2020 / PQ / HLG）のトリミング・スライスができるデスクトップアプリです。
-Electron + SolidJS + Vite で構築されています。
 
-## プロジェクト構成
+## ユーザーガイド (For Users)
 
-*   **electron/**: Mainプロセス。ファイルシステム操作や `child_process` (ffmpeg) の実行を担当します。
+### インストールと起動
 
-## 開発・テスト
+GitHub の Releases ページからダウンロードしたアプリを実行する際、OSのセキュリティ機能により起動がブロックされる場合があります。
+
+#### macOS: "App is damaged" (壊れているため開けません) と出る場合
+
+Apple Silicon (M1/M2/etc) 環境では、Webからダウンロードした未署名（Ad-hoc署名）アプリは「壊れている」と判定されます。以下のいずれかの方法で回避してください。
+
+**方法1: GUIツールを使用する (推奨)**
+1.  オープンソースのツール **[Sentinel](https://github.com/alienator88/Sentinel/releases)** をダウンロードして起動します。
+2.  `FF HDR Splicer.app` を Sentinel のウィンドウにドラッグ＆ドロップします。
+3.  これで起動できるようになります。
+
+**方法2: ターミナルを使用する**
+ターミナルを開き、以下のコマンドを実行して属性を削除します。
+
+```bash
+xattr -cr /path/to/extracted/FF\ HDR\ Splicer.app
+# 例: xattr -cr /Applications/FF\ HDR\ Splicer.app
+```
+
+### 使い方
+
+1.  アプリを起動し、「Choose File」から編集したい動画ファイルを選択します。
+2.  タイムラインでカットしたい区間を指定・分割します。
+3.  「Delete」キーで不要な区間を削除したりできます。
+4.  右上の「Export」ボタンを押すと、編集された動画が書き出されます（ffmpegによるロスレス結合ではありませんが、高品質で書き出されます）。
+
+---
+
+## 開発者向けドキュメント (For Developers)
+
+### 開発・テスト
 
 ```bash
 # 依存関係のインストール
@@ -20,10 +49,9 @@ npm run dev
 npm run test
 ```
 
-## ビルド
+### ビルド
 
 手元でビルドする場合、**現在作業しているOS用のバイナリ** しか同梱されません。
-（例: Macで `build:win` をしても、中身の ffmpeg は Mac用のままになり、Windowsで動きません！）
 
 ```bash
 # Mac用ビルド (.dmg)
@@ -34,7 +62,7 @@ npm run build:mac
 npm run build:win
 ```
 
-## リリース
+### リリース
 
 GitHub Actions を使ってクロスプラットフォームビルドを行います。
 
@@ -46,8 +74,3 @@ GitHub Actions を使ってクロスプラットフォームビルドを行い�
     ```
 3.  **公開**:
     GitHub Actions がドラフトリリースを作成するので、Releases ページで確認し「Publish」ボタンを押して公開します。
-
-## 環境設定の注意点
-
-*   **package-lock.json**: `ffmpeg-static` のバージョンを固定するために必須です。
-*   **Sign Off (Mac)**: 開発用ビルドの高速化とログの匿名化のため、`package.json` で `mac.identity: null` (署名なし) に設定しています。

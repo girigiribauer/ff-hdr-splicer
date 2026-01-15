@@ -19,7 +19,7 @@ describe('FfmpegService', () => {
         vi.clearAllMocks()
     })
 
-    function mockSpawn(stdout: string, code: number = 0) {
+    function mockSpawn(stdout: string, code: number = 0, stderrEvents: string[] = []) {
         const spawnMock = vi.mocked(spawn)
 
         spawnMock.mockImplementation((command: string, args: readonly string[]) => {
@@ -29,7 +29,7 @@ describe('FfmpegService', () => {
             child.kill = vi.fn()
 
             // Basic stderr handler
-            child.stderr.on = (event: string, cb: any) => { /* no-op */ }
+            // child.stderr.on = (event: string, cb: any) => { /* no-op */ } // Removed to allow listeners
 
             setTimeout(() => {
                 // Check if this is the probe command or the main command
@@ -58,8 +58,12 @@ describe('FfmpegService', () => {
                         child.emit('close', 0)
                     }
                 } else {
-                    // Assume ffmpeg (splice command)
+                    // Assume ffmpeg (splice command or proxy)
                     child.stdout.emit('data', stdout)
+                    // Emit stderr events if provided (simulating progress)
+                    if (stderrEvents && stderrEvents.length > 0) {
+                        stderrEvents.forEach(e => child.stderr.emit('data', e))
+                    }
                     child.emit('close', code)
                 }
             }, 10)
@@ -282,6 +286,62 @@ describe('FfmpegService', () => {
             expect(filter).toContain('fade=t=in:st=0:d=1.5')
             expect(filter).toContain('fade=t=out')
             expect(filter).toContain('concat=n=1')
+        })
+    })
+
+    describe('generateProxy', () => {
+        it('プロキシ生成コマンドが正しく発行される', async () => {
+            mockSpawn('')
+
+            const result = await FfmpegService.generateProxy('in.mov')
+
+            expect(result.success).toBe(true)
+
+            const spawnCalls = vi.mocked(spawn).mock.calls
+            const lastCall = spawnCalls[spawnCalls.length - 1]
+            const args = lastCall[1] as string[]
+
+            expect(args).toContain('scale=-1:480')
+            expect(args).toContain('libx264')
+            expect(args).toContain('ultrafast')
+        })
+
+        it('進捗コールバックが呼ばれる', async () => {
+            const formatJson = JSON.stringify({
+                format: { duration: "100.000000" },
+                streams: []
+            })
+
+            const stderrLogs = [
+                'frame= 100 fps= 0.0 q=0.0 size= 0kB time=00:00:50.00 bitrate=N/A speed= N/A'
+            ]
+
+            mockSpawn(formatJson, 0, stderrLogs)
+
+            const onProgress = vi.fn()
+            await FfmpegService.generateProxy('in.mov', onProgress)
+
+            expect(onProgress).toHaveBeenCalledWith(50)
+        })
+    })
+
+    describe('spliceSegments Progress', () => {
+        it('進捗コールバックが正しく呼ばれる', async () => {
+            const segments = [
+                { start: 0, end: 10 },
+                { start: 20, end: 30 }
+            ]
+
+            const stderrLogs = [
+                'frame=... time=00:00:10.00 ...'
+            ]
+
+            mockSpawn('', 0, stderrLogs)
+
+            const onProgress = vi.fn()
+            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', undefined, onProgress)
+
+            expect(onProgress).toHaveBeenCalledWith(50)
         })
     })
 })

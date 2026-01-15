@@ -22,13 +22,6 @@ const template: Electron.MenuItemConstructorOptions[] = [
       { type: 'separator' },
       { role: 'quit' }
     ]
-  },
-  {
-    label: 'View',
-    submenu: [
-      { role: 'reload' },
-      { role: 'toggleDevTools' }
-    ]
   }
 ]
 
@@ -42,8 +35,21 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
-      webSecurity: true
+      webSecurity: true,
+      // Disable DevTools in production (native Electron way)
+      devTools: process.env.NODE_ENV === 'development'
     },
+  })
+
+  // Block sensitive permissions
+  win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media'] // Add any required permissions here
+    if (allowedPermissions.includes(permission)) {
+      callback(true)
+    } else {
+      console.log(`Blocked permission request: ${permission}`)
+      callback(false)
+    }
   })
 
   win.webContents.on('did-finish-load', () => {
@@ -120,8 +126,19 @@ app.whenReady().then(() => {
       outPath = path.join(outDirTarget, `${name}_splice_${Date.now()}${ext}`)
     }
 
-    return await FfmpegService.spliceSegments(filePath, segments, outPath, fadeOptions)
+    return await FfmpegService.spliceSegments(filePath, segments, outPath, fadeOptions, (percent) => {
+      _event.sender.send('export-progress', { percent })
+    })
   })
+
+  ipcMain.handle('run-generate-proxy', async (_event, filePath) => {
+    if (!filePath) return { success: false, error: 'No file path provided' }
+    return await FfmpegService.generateProxy(filePath, (percent) => {
+      _event.sender.send('proxy-progress', { percent })
+    })
+  })
+
+
 
   ipcMain.handle('show-open-dialog', async () => {
     const { dialog } = await import('electron')
@@ -145,9 +162,16 @@ app.whenReady().then(() => {
 
   ipcMain.handle('show-save-dialog', async (_event, defaultName) => {
     const { dialog } = await import('electron')
+    const path = await import('node:path')
+    const ext = path.extname(defaultName).replace('.', '') || 'mov'
+
+    // Reorder extensions to prioritize the current one
+    const allExts = ['mov', 'mp4', 'mkv']
+    const contextExts = [ext, ...allExts.filter(e => e !== ext)]
+
     const result = await dialog.showSaveDialog({
       defaultPath: defaultName,
-      filters: [{ name: 'Movies', extensions: ['mov', 'mp4', 'mkv'] }]
+      filters: [{ name: 'Movies', extensions: contextExts }]
     })
     return result
   })
