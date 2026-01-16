@@ -13,6 +13,13 @@ vi.mock('node:fs', () => ({
     }
 }))
 
+// Mock electron
+vi.mock('electron', () => ({
+    BrowserWindow: {
+        getAllWindows: vi.fn().mockReturnValue([])
+    }
+}))
+
 describe('MediaProtocol', () => {
     beforeEach(() => {
         vi.clearAllMocks()

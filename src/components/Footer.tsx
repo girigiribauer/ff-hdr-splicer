@@ -23,9 +23,9 @@ export const Footer: Component<FooterProps> = (props) => {
                 <button
                     class={styles.versionInfo}
                     onClick={() => {
-                        if (import.meta.env.DEV) {
-                            setShowLogs(!showLogs())
-                        }
+                        // if (import.meta.env.DEV) {
+                        setShowLogs(!showLogs())
+                        // }
                     }}
                     style={{ cursor: import.meta.env.DEV ? 'pointer' : 'default' }}
                 >

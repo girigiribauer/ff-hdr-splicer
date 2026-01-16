@@ -1,9 +1,19 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
+import { BrowserWindow } from 'electron'
+
+function log(...args: any[]) {
+    console.log(...args)
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+    // Send to all renderers (simple approach for single window app)
+    BrowserWindow.getAllWindows().forEach(w => {
+        w.webContents.send('debug-log', `[MediaProtocol] ${msg}`)
+    })
+}
 
 export async function handleMediaRequest(request: Request): Promise<Response> {
-    console.log('[MediaProtocol] Request URL:', request.url)
+    log('Request URL:', request.url)
     let url = request.url.replace('media://', '')
 
     // Ensure absolute path logic (for Mac/Linux)
@@ -13,28 +23,28 @@ export async function handleMediaRequest(request: Request): Promise<Response> {
 
     try {
         const filePath = decodeURIComponent(url)
-        console.log('[MediaProtocol] Resolved Path:', filePath)
+        log('Resolved Path:', filePath)
 
         // Simple MIME type logic
         const ext = path.extname(filePath).toLowerCase()
         let mimeType = 'video/mp4'
         if (ext === '.mov') mimeType = 'video/quicktime'
         if (ext === '.mkv') mimeType = 'video/x-matroska'
-        console.log('[MediaProtocol] Determined MIME:', mimeType)
+        log('Determined MIME:', mimeType)
 
         const stats = await fs.promises.stat(filePath)
-        console.log('[MediaProtocol] File Found:', filePath, 'Size:', stats.size)
+        log('File Found:', filePath, 'Size:', stats.size)
 
         const fileSize = stats.size // fs.Stats.size returns number
         const range = request.headers.get('Range')
-        console.log('[MediaProtocol] Range Header:', range)
+        log('Range Header:', range)
 
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-")
             const start = parseInt(parts[0], 10)
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
             const chunksize = (end - start) + 1
-            console.log(`[MediaProtocol] Serving Range: ${start}-${end} (Chunk: ${chunksize})`)
+            log(`Serving Range: ${start}-${end} (Chunk: ${chunksize})`)
 
             const nodeStream = fs.createReadStream(filePath, { start, end })
             const webStream = Readable.toWeb(nodeStream)
@@ -62,7 +72,7 @@ export async function handleMediaRequest(request: Request): Promise<Response> {
             })
         }
     } catch (error: any) {
-        console.error('[Media Protocol] Error:', error)
+        log('Error:', error)
         if (error.code === 'ENOENT' || error.message.includes('ENOENT')) {
             return new Response('File not found', { status: 404 })
         }

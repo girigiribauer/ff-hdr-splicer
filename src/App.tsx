@@ -40,6 +40,13 @@ function App() {
   // Auto-check on mount
   onMount(() => {
     checkFFmpeg()
+
+    // Listen for backend debug logs (Temporary)
+    if (window.ipcRenderer) {
+      window.ipcRenderer.on('debug-log', (_e, msg) => {
+        addLog(msg)
+      })
+    }
   })
 
   // Handlers
