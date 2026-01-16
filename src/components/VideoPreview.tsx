@@ -9,6 +9,7 @@ interface VideoPreviewProps {
     onPlay: () => void
     onPause: () => void
     onClick: () => void
+    onError?: (e: Event) => void
 }
 
 export const VideoPreview: Component<VideoPreviewProps> = (props) => {
@@ -22,6 +23,7 @@ export const VideoPreview: Component<VideoPreviewProps> = (props) => {
                 onTimeUpdate={props.onTimeUpdate}
                 onPlay={props.onPlay}
                 onPause={props.onPause}
+                onError={props.onError}
                 crossOrigin="anonymous"
             />
         </div>

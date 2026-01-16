@@ -49,6 +49,14 @@ export function VideoEditor(props: VideoEditorProps) {
     // Media protocol (Use proxy if available)
     const getMediaUrl = (path: string) => `media://${proxyPath() || path}`
 
+    const handleVideoError = (e: Event) => {
+        const vid = e.target as HTMLVideoElement
+        const err = vid.error
+        props.addLog(`[DEBUG] Video Error: Code=${err?.code}, Msg=${err?.message}`)
+        props.addLog(`[DEBUG] Src: ${vid.src}`)
+        props.addLog(`[DEBUG] NetworkState: ${vid.networkState}, ReadyState: ${vid.readyState}`)
+    }
+
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
         if (isFinite(vid.duration)) {
@@ -184,6 +192,7 @@ export function VideoEditor(props: VideoEditorProps) {
                 onTimeUpdate={handleTimeUpdate}
                 onPlay={handlePlay}
                 onPause={handlePause}
+                onError={handleVideoError}
                 onClick={() => {
                     const v = videoRef()
                     if (v) v.paused ? v.play() : v.pause()
