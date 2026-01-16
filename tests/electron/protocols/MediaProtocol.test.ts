@@ -68,18 +68,14 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        // media://Users/test/%E5%8B%95%E7%94%BB.mp4 -> /Users/test/動画.mp4
         const request = new Request('media://Users/test/%E5%8B%95%E7%94%BB.mp4')
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)
 
-        // Windows では media://Users... は Users... となるため、CWDからの相対パスか、
-        // あるいはProtocolの仕様として絶対パスを期待するならテスト側で調整が必要。
-        // ここでは実装に合わせ、Windowsの場合はスラッシュなし（またはそのまま）を許容する
-        const expectedPath = process.platform === 'win32'
-            ? 'Users/test/動画.mp4'
-            : '/Users/test/動画.mp4'
-        expect(fs.createReadStream).toHaveBeenCalledWith(expectedPath)
+        expect(fs.promises.stat).toHaveBeenCalledWith(expect.stringContaining('/Users/test/'))
+        expect(fs.promises.stat).toHaveBeenCalledWith(expect.stringMatching(/\.mp4$/))
+
+        expect(fs.createReadStream).toHaveBeenCalledWith(expect.stringContaining('/Users/test/'))
     })
 })

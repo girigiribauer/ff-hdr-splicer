@@ -2,6 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import { BrowserWindow } from 'electron'
+import { normalizeMediaUrlToPath } from '../utils/PathUtils'
 
 function log(...args: any[]) {
     console.log(...args)
@@ -14,15 +15,9 @@ function log(...args: any[]) {
 
 export async function handleMediaRequest(request: Request): Promise<Response> {
     log('Request URL:', request.url)
-    let url = request.url.replace('media://', '')
-
-    // Ensure absolute path logic (for Mac/Linux)
-    if (process.platform !== 'win32' && !url.startsWith('/')) {
-        url = '/' + url
-    }
 
     try {
-        const filePath = decodeURIComponent(url)
+        const filePath = normalizeMediaUrlToPath(request.url)
         log('Resolved Path:', filePath)
 
         // Simple MIME type logic
