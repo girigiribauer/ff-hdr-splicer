@@ -61,8 +61,11 @@ export async function handleMediaRequest(request: Request): Promise<Response> {
                 headers
             })
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Media Protocol] Error:', error)
+        if (error.code === 'ENOENT' || error.message.includes('ENOENT')) {
+            return new Response('File not found', { status: 404 })
+        }
         return new Response('Internal Server Error', { status: 500 })
     }
 }
