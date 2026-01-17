@@ -182,7 +182,11 @@ export function VideoEditor(props: VideoEditorProps) {
                 fileMetadata={props.fileMetadata}
                 isExporting={isExporting()}
                 onBack={props.onBack}
-                onExport={() => startExport(props.filePath, segments(), fadeOptions())}
+                onExport={() => {
+                    const v = videoRef()
+                    if (v && !v.paused) v.pause()
+                    startExport(props.filePath, segments(), fadeOptions())
+                }}
             />
 
             <VideoPreview
