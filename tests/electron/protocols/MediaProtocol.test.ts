@@ -73,9 +73,15 @@ describe('MediaProtocol', () => {
 
         expect(response.status).toBe(200)
 
-        expect(fs.promises.stat).toHaveBeenCalledWith(expect.stringContaining('/Users/test/'))
-        expect(fs.promises.stat).toHaveBeenCalledWith(expect.stringMatching(/\.mp4$/))
+        const statCalls = (fs.promises.stat as any).mock.calls
+        expect(statCalls.length).toBeGreaterThan(0)
+        const lastStatArg = statCalls[statCalls.length - 1][0]
+        expect(lastStatArg).toContain('/Users/test/')
+        expect(lastStatArg).toMatch(/\.mp4$/)
 
-        expect(fs.createReadStream).toHaveBeenCalledWith(expect.stringContaining('/Users/test/'))
+        const createStreamCalls = (fs.createReadStream as any).mock.calls
+        expect(createStreamCalls.length).toBeGreaterThan(0)
+        const lastStreamArg = createStreamCalls[createStreamCalls.length - 1][0]
+        expect(lastStreamArg).toContain('/Users/test/')
     })
 })
