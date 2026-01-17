@@ -30,7 +30,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media://Users/test/video.mp4')
+        const request = new Request('media:///Users/test/video.mp4')
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)
@@ -43,7 +43,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media://Users/test/video.mov', {
+        const request = new Request('media:///Users/test/video.mov', {
             headers: { 'Range': 'bytes=0-499' }
         })
         const response = await handleMediaRequest(request)
@@ -57,7 +57,7 @@ describe('MediaProtocol', () => {
     it('存在しないファイルへのリクエストで404を返すべき', async () => {
         vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('ENOENT'))
 
-        const request = new Request('media://Users/test/missing.mp4')
+        const request = new Request('media:///Users/test/missing.mp4')
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(404)
@@ -68,7 +68,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media://Users/test/%E5%8B%95%E7%94%BB.mp4')
+        const request = new Request('media:///Users/test/%E5%8B%95%E7%94%BB.mp4')
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)

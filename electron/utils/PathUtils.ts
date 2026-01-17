@@ -1,16 +1,8 @@
-export function normalizeMediaUrlToPath(url: string, platform: string = process.platform): string {
-    const rawPath = url.replace('media://', '')
-    let filePath = decodeURIComponent(rawPath)
+import { fileURLToPath } from 'node:url'
+import { platform } from 'node:process'
 
-    if (platform === 'win32') {
-        if (/^\/[a-zA-Z]:/.test(filePath)) {
-            filePath = filePath.slice(1)
-        }
-    } else {
-        if (!filePath.startsWith('/')) {
-            filePath = '/' + filePath
-        }
-    }
+export function normalizeMediaUrlToPath(url: string, _platform: string = platform): string {
+    const fileUrl = url.replace(/^media:/, 'file:')
 
-    return filePath
+    return fileURLToPath(fileUrl)
 }

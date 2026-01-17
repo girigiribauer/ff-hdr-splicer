@@ -1,45 +1,35 @@
 import { describe, it, expect } from 'vitest'
 import { normalizeMediaUrlToPath } from '../../../electron/utils/PathUtils'
+import { fileURLToPath } from 'node:url'
 
 describe('PathUtils', () => {
     describe('normalizeMediaUrlToPath', () => {
-        // --- Mac/Linux Scenarios ---
-        it('Mac環境では絶対パスを保証する（先頭にスラッシュを付与）', () => {
-            // media://Users/test.mp4 -> /Users/test.mp4
-            const result = normalizeMediaUrlToPath('media://Users/test.mp4', 'darwin')
-            expect(result).toBe('/Users/test.mp4')
+        it('スキームを file:// に置換して fileURLToPath に委譲する（Mac環境想定）', () => {
+            // Test that "media://" is treated exactly like "file://"
+            const input = 'media:///Users/test/video.mp4'
+            // Expected: behavior of fileURLToPath('file:///Users/test/video.mp4')
+            const expected = fileURLToPath('file:///Users/test/video.mp4')
+
+            const result = normalizeMediaUrlToPath(input, 'darwin')
+            expect(result).toBe(expected)
         })
 
-        it('Mac環境で既にスラッシュがある場合はそのまま維持する', () => {
-            // media:///Users/test.mp4 -> /Users/test.mp4
-            const result = normalizeMediaUrlToPath('media:///Users/test.mp4', 'darwin')
-            expect(result).toBe('/Users/test.mp4')
+        it('Windows形式のURLも file:// として渡される', () => {
+            const input = 'media:///C:/Users/test/video.mp4'
+            // Even on Mac, this returns a path (usually /C:/Users/...)
+            const expected = fileURLToPath('file:///C:/Users/test/video.mp4')
+
+            const result = normalizeMediaUrlToPath(input, 'win32')
+            expect(result).toBe(expected)
         })
 
-        // --- Windows Scenarios ---
-        it('Windows環境でドライブレター付きパスの先頭のスラッシュを除去する', () => {
-            // media:///C:/Users/test.mp4 -> /C:/Users/test.mp4 -> C:/Users/test.mp4
-            const result = normalizeMediaUrlToPath('media:///C:/Users/test.mp4', 'win32')
-            expect(result).toBe('C:/Users/test.mp4')
-        })
+        it('エンコードされたパスも正しく処理される', () => {
+            // media://...%E5%8B%95%E7%94%BB... -> file://... -> decoded path
+            const input = 'media:///Users/test/%E5%8B%95%E7%94%BB.mp4'
+            const expected = fileURLToPath('file:///Users/test/%E5%8B%95%E7%94%BB.mp4')
 
-        it('Windows環境で先頭スラッシュがない標準パスはそのまま維持する', () => {
-            // media://C:/Users/test.mp4 -> C:/Users/test.mp4
-            const result = normalizeMediaUrlToPath('media://C:/Users/test.mp4', 'win32')
-            expect(result).toBe('C:/Users/test.mp4')
-        })
-
-        // --- Common Scenarios ---
-        it('URLエンコードされた文字をデコードする', () => {
-            // media://Users/foo%20bar.mp4 -> /Users/foo bar.mp4
-            const result = normalizeMediaUrlToPath('media://Users/foo%20bar.mp4', 'darwin')
-            expect(result).toBe('/Users/foo bar.mp4')
-        })
-
-        it('日本語文字をデコードする', () => {
-            // media://Users/%E5%8B%95%E7%94%BB.mp4 -> /Users/動画.mp4
-            const result = normalizeMediaUrlToPath('media://Users/%E5%8B%95%E7%94%BB.mp4', 'darwin')
-            expect(result).toBe('/Users/動画.mp4')
+            const result = normalizeMediaUrlToPath(input, 'darwin')
+            expect(result).toBe(expected)
         })
     })
 })

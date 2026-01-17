@@ -13,6 +13,7 @@ import { DurationDisplay } from './DurationDisplay'
 import { ProgressOverlay } from './ProgressOverlay'
 import { useProxyGenerator } from '../hooks/useProxyGenerator'
 import { useVideoExport } from '../hooks/useVideoExport'
+import { toMediaUrl } from '../utils/MediaUrlUtils'
 import styles from './VideoEditor.module.css'
 
 interface VideoEditorProps {
@@ -46,8 +47,7 @@ export function VideoEditor(props: VideoEditorProps) {
 
     const { isExporting, exportProgress, startExport } = useVideoExport(props.addLog)
 
-    // Media protocol (Use proxy if available)
-    const getMediaUrl = (path: string) => `media://${proxyPath() || path}`
+    const getMediaUrl = (path: string) => toMediaUrl(path, proxyPath())
 
     const handleVideoError = (e: Event) => {
         const vid = e.target as HTMLVideoElement
