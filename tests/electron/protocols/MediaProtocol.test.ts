@@ -25,12 +25,17 @@ describe('MediaProtocol', () => {
         vi.clearAllMocks()
     })
 
+    // OSに応じてテストデータのパスを切り替える
+    // 標準ライブラリ(fileURLToPath)を使うため、実行OSに適した絶対パスが必要
+    const isWin = process.platform === 'win32'
+    const BASE_PATH = isWin ? 'C:/Users/test/' : '/Users/test/'
+
     it('通常リクエストでファイル全体を返すべき (200 OK)', async () => {
         vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1000 } as any)
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media:///Users/test/video.mp4')
+        const request = new Request(`media://${BASE_PATH}video.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)
@@ -43,7 +48,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media:///Users/test/video.mov', {
+        const request = new Request(`media://${BASE_PATH}video.mov`, {
             headers: { 'Range': 'bytes=0-499' }
         })
         const response = await handleMediaRequest(request)
@@ -57,7 +62,7 @@ describe('MediaProtocol', () => {
     it('存在しないファイルへのリクエストで404を返すべき', async () => {
         vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('ENOENT'))
 
-        const request = new Request('media:///Users/test/missing.mp4')
+        const request = new Request(`media://${BASE_PATH}missing.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(404)
@@ -68,7 +73,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request('media:///Users/test/%E5%8B%95%E7%94%BB.mp4')
+        const request = new Request(`media://${BASE_PATH}%E5%8B%95%E7%94%BB.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)
@@ -76,13 +81,19 @@ describe('MediaProtocol', () => {
         const statCalls = (fs.promises.stat as any).mock.calls
         expect(statCalls.length).toBeGreaterThan(0)
         const lastStatArg = statCalls[statCalls.length - 1][0]
-        // Windows(CI)では先頭スラッシュがつかない場合があるため、スラッシュなしで判定する
-        expect(lastStatArg).toContain('Users/test/')
-        expect(lastStatArg).toMatch(/\.mp4$/)
+
+        // ファイルパスが含まれていることを確認（OSによりセパレータが違うが、部分一致で確認）
+        // Users/test/... という共通部分でチェック
+        expect(lastStatArg).toContain('Users')
+        expect(lastStatArg).toContain('test')
+        if (isWin) {
+            expect(lastStatArg).toContain('C:')
+        }
+        expect(lastStatArg).toMatch(/動画\.mp4$/)
 
         const createStreamCalls = (fs.createReadStream as any).mock.calls
         expect(createStreamCalls.length).toBeGreaterThan(0)
         const lastStreamArg = createStreamCalls[createStreamCalls.length - 1][0]
-        expect(lastStreamArg).toContain('Users/test/')
+        expect(lastStreamArg).toContain('Users')
     })
 })
