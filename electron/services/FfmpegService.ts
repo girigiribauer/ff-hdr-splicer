@@ -258,7 +258,7 @@ function parseTimeStr(timeStr: string): number {
 export async function generateProxy(
     filePath: string,
     onProgress?: (percent: number) => void
-): Promise<{ success: boolean; proxyPath?: string; error?: string }> {
+): Promise<{ success: boolean; proxyPath?: string; error?: string; stderr?: string }> {
     const ffmpegPath = getFFmpegPath()
     const path = await import('node:path')
     const os = await import('node:os')
@@ -290,6 +290,7 @@ export async function generateProxy(
         '-i', filePath,
         '-vf', 'scale=-1:480',
         '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p', // Ensure 8-bit output for compatibility (fixes 10-bit to 8-bit issues)
         '-preset', 'ultrafast',
         '-crf', '30',
         '-c:a', 'aac',
@@ -300,9 +301,11 @@ export async function generateProxy(
     return new Promise((resolve) => {
         const child = spawn(ffmpegPath, args)
 
+        let stderr = ''
         if (onProgress && duration > 0) {
             child.stderr.on('data', (d) => {
                 const s = d.toString()
+                stderr += s
                 const match = s.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/)
                 if (match) {
                     const sec = parseTimeStr(match[1])
@@ -310,11 +313,13 @@ export async function generateProxy(
                     onProgress(p)
                 }
             })
+        } else {
+            child.stderr.on('data', d => stderr += d.toString())
         }
 
         child.on('close', (code) => {
             if (code === 0) resolve({ success: true, proxyPath })
-            else resolve({ success: false, error: `Proxy generation failed with code ${code}` })
+            else resolve({ success: false, error: `Proxy generation failed with code ${code}`, stderr })
         })
         child.on('error', (err) => resolve({ success: false, error: err.message }))
     })

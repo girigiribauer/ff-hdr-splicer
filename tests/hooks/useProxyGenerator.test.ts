@@ -79,7 +79,7 @@ describe('useProxyGenerator', () => {
         const [path, setPath] = createSignal<string>('/video.mov')
         const addLog = vi.fn()
 
-        mockInvoke.mockResolvedValue({ success: false })
+        mockInvoke.mockResolvedValue({ success: false, error: 'Test Error' })
 
         const { result } = runHookInRoot(() => useProxyGenerator(path, addLog))
 
@@ -88,7 +88,7 @@ describe('useProxyGenerator', () => {
         })
 
         expect(result.proxyPath()).toBe(null)
-        expect(addLog).toHaveBeenCalledWith('Proxy generation failed (using original).')
+        expect(addLog).toHaveBeenCalledWith('Proxy generation failed: Test Error')
     })
 
     it('進捗イベントを受け取り、progressが更新される', async () => {

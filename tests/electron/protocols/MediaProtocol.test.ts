@@ -29,13 +29,20 @@ describe('MediaProtocol', () => {
     // 標準ライブラリ(fileURLToPath)を使うため、実行OSに適した絶対パスが必要
     const isWin = process.platform === 'win32'
     const BASE_PATH = isWin ? 'C:/Users/test/' : '/Users/test/'
+    // Windows: media:///C:/... (3 slashes)
+    // Mac:     media:///Users/... (media:// + /Users...) (3 slashes total)
+    // Wait, on Mac BASE_PATH starts with /. So media:// + BASE_PATH = media:///Users.
+    // On Win BASE_PATH starts with C. So media:// + BASE_PATH = media://C:. THIS IS WRONG for file URL. Needs ///.
+
+    const URL_PREFIX = isWin ? 'media:///' : 'media://'
 
     it('通常リクエストでファイル全体を返すべき (200 OK)', async () => {
         vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1000 } as any)
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request(`media://${BASE_PATH}video.mp4`)
+        // URL_PREFIX handles the slash logic (media:/// for Win, media:// for Mac if path starts with /)
+        const request = new Request(`${URL_PREFIX}${BASE_PATH}video.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)
@@ -48,7 +55,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request(`media://${BASE_PATH}video.mov`, {
+        const request = new Request(`${URL_PREFIX}${BASE_PATH}video.mov`, {
             headers: { 'Range': 'bytes=0-499' }
         })
         const response = await handleMediaRequest(request)
@@ -62,7 +69,7 @@ describe('MediaProtocol', () => {
     it('存在しないファイルへのリクエストで404を返すべき', async () => {
         vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('ENOENT'))
 
-        const request = new Request(`media://${BASE_PATH}missing.mp4`)
+        const request = new Request(`${URL_PREFIX}${BASE_PATH}missing.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(404)
@@ -73,7 +80,7 @@ describe('MediaProtocol', () => {
         const mockStream = Readable.from(Buffer.from('dummy data'))
         vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any)
 
-        const request = new Request(`media://${BASE_PATH}%E5%8B%95%E7%94%BB.mp4`)
+        const request = new Request(`${URL_PREFIX}${BASE_PATH}%E5%8B%95%E7%94%BB.mp4`)
         const response = await handleMediaRequest(request)
 
         expect(response.status).toBe(200)

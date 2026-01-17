@@ -15,5 +15,7 @@ export const toMediaUrl = (path: string, proxyPath?: string | null): string => {
         normalized = '/' + normalized
     }
 
-    return `media://${encodeURI(normalized)}`
+    const url = `media://${encodeURI(normalized)}`
+    console.log('[MediaUrlUtils] Generated:', { path, proxyPath, normalized, url })
+    return url
 }

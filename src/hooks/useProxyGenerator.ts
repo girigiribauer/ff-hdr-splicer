@@ -33,7 +33,12 @@ export function useProxyGenerator(filePath: () => string, addLog: (msg: string) 
                 setProxyPath(res.proxyPath)
                 addLog('Proxy generated for preview.')
             } else {
-                addLog('Proxy generation failed (using original).')
+                addLog(`Proxy generation failed: ${res.error}`)
+                if (res.stderr) {
+                   // Log last 200 chars of stderr to avoid spamming
+                   const errLog = res.stderr.slice(-200)
+                   addLog(`FFmpeg stderr (tail): ${errLog}`)
+                }
             }
         } catch (e: any) {
             addLog(`Proxy Error: ${e.message}`)
