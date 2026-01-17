@@ -76,12 +76,13 @@ describe('MediaProtocol', () => {
         const statCalls = (fs.promises.stat as any).mock.calls
         expect(statCalls.length).toBeGreaterThan(0)
         const lastStatArg = statCalls[statCalls.length - 1][0]
-        expect(lastStatArg).toContain('/Users/test/')
+        // Windows(CI)では先頭スラッシュがつかない場合があるため、スラッシュなしで判定する
+        expect(lastStatArg).toContain('Users/test/')
         expect(lastStatArg).toMatch(/\.mp4$/)
 
         const createStreamCalls = (fs.createReadStream as any).mock.calls
         expect(createStreamCalls.length).toBeGreaterThan(0)
         const lastStreamArg = createStreamCalls[createStreamCalls.length - 1][0]
-        expect(lastStreamArg).toContain('/Users/test/')
+        expect(lastStreamArg).toContain('Users/test/')
     })
 })
