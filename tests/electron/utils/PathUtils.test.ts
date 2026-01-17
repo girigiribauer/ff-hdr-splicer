@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 
 describe('PathUtils', () => {
     describe('normalizeMediaUrlToPath', () => {
-        it('スキームを file:// に置換して fileURLToPath に委譲する（Mac環境想定）', () => {
+        const isWin = process.platform === 'win32'
+
+        it.skipIf(isWin)('スキームを file:// に置換して fileURLToPath に委譲する（Mac環境想定）', () => {
             // Test that "media://" is treated exactly like "file://"
             const input = 'media:///Users/test/video.mp4'
             // Expected: behavior of fileURLToPath('file:///Users/test/video.mp4')
