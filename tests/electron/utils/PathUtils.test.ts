@@ -25,6 +25,21 @@ describe('PathUtils', () => {
             expect(result).toBe(expected)
         })
 
+        it('Windows形式でドライブレターのコロンが欠落している場合、自動補完する (media:///c/Users -> c:/Users)', () => {
+            // Simulate "media://c/Users/..." which might happen if browser/electron strips the colon
+            const input = 'media:///c/Users/test/video.mp4'
+
+            // We expect it to be normalized to a valid file URL with colon
+            // fileURLToPath will then handle it correctly.
+            // On Mac running this test, fileURLToPath('file:///c:/...') produces /c:/Users/...
+            // On Windows, it produces c:\Users...
+            const expected = fileURLToPath('file:///c:/Users/test/video.mp4')
+
+            // Force 'win32' platform to trigger the fix logic
+            const result = normalizeMediaUrlToPath(input, 'win32')
+            expect(result).toBe(expected)
+        })
+
         it('エンコードされたパスも正しく処理される', () => {
             // Use platform specific path to avoid "File URL path must be absolute" error on Windows
             // when feeding a POSIX path to fileURLToPath.
