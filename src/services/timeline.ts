@@ -38,17 +38,19 @@ export function createSegmentSpecs(
     }
 
     let start = time
-    let end = time + duration
 
     const sorted = sortSegments(segments)
-    const nextSeg = sorted.find(s => s.start >= time)
+    const nextSeg = sorted.find(s => s.start > time + 0.001) // Margin to avoid self-overlap issues
 
-    if (nextSeg) {
-        if (end > nextSeg.start) {
-            end = nextSeg.start
-        }
-    }
+    // Fill to next segment or max duration
+    let end = nextSeg ? nextSeg.start : maxDuration
 
+    // Previous implementation used fixed duration, now we fill available space.
+    // However, if the gap is extremely small, we might want to return null?
+    // User requested "expand as much as possible".
+    // If end - start is very small (e.g. < 0.1s), the UI usually handles it (or it's just a tiny segment).
+
+    // Ensure we don't exceed maxDuration (redundant if nextSeg logic is correct, but safe)
     if (end > maxDuration) {
         end = maxDuration
     }

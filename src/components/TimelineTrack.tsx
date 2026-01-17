@@ -15,6 +15,7 @@ interface TimelineTrackProps {
     enableFadeIn: boolean
     enableFadeOut: boolean
     enableCrossfade: boolean
+    onSeek: (time: number) => void
 }
 
 export function TimelineTrack(props: TimelineTrackProps) {
@@ -40,10 +41,27 @@ export function TimelineTrack(props: TimelineTrackProps) {
     const handleTrackMouseDown = (e: MouseEvent) => {
         if (!trackRef) return
         const time = getTimeFromX(e.clientX, trackRef.getBoundingClientRect())
-        const newId = props.onAddSegment(time, 0)
-        if (newId) {
-            setDragState({ type: 'end', targetId: newId, isCreating: true, originTime: time })
-        }
+        // Unify UX: Click on empty space also Seeks (creates consistency)
+        // User uses (+) button or 'S' key to add segments now.
+        props.onSeek(time)
+        props.onSelectSegment(null) // Deselect any active segment
+
+        // Enable Scrubbing (Drag to Seek)
+        setDragState({ type: 'move', targetId: 'SCRUBBER' })
+        window.addEventListener('mousemove', handleScrubMove)
+        window.addEventListener('mouseup', handleScrubUp)
+    }
+
+    const handleScrubMove = (e: MouseEvent) => {
+        if (!trackRef) return
+        const time = getTimeFromX(e.clientX, trackRef.getBoundingClientRect())
+        props.onSeek(time)
+    }
+
+    const handleScrubUp = () => {
+        window.removeEventListener('mousemove', handleScrubMove)
+        window.removeEventListener('mouseup', handleScrubUp)
+        setDragState(null)
     }
 
     const handleSegmentMouseDown = (e: MouseEvent, id: string) => {
@@ -54,6 +72,8 @@ export function TimelineTrack(props: TimelineTrackProps) {
         const clickTime = getTimeFromX(e.clientX, rect)
         const seg = props.segments.find(s => s.id === id)
         const startOffset = seg ? clickTime - seg.start : 0
+
+        props.onSeek(clickTime)
 
         props.onSelectSegment(id)
         setDragState({ type: 'move', targetId: id, startOffset })
@@ -77,7 +97,10 @@ export function TimelineTrack(props: TimelineTrackProps) {
 
         if (type === 'start') {
             const { start } = resizeSegment(props.segments, seg.id, time, seg.end, props.max)
-            if (start !== seg.start) props.onChange(seg.id, start, seg.end)
+            if (start !== seg.start) {
+                props.onChange(seg.id, start, seg.end)
+                props.onSeek(start) // Update playhead to new start
+            }
         } else if (type === 'end') {
             if (isCreating && dragState()?.originTime !== undefined) {
                 const origin = dragState()!.originTime!
@@ -90,6 +113,7 @@ export function TimelineTrack(props: TimelineTrackProps) {
 
                 if (start !== seg.start || end !== seg.end) {
                     props.onChange(seg.id, start, end)
+                    props.onSeek(end) // Update playhead to new end (or valid end)
                 }
             } else {
                 // Normal resizing logic (end handle only)
@@ -97,7 +121,10 @@ export function TimelineTrack(props: TimelineTrackProps) {
                 // Prevent dragging end handle before start
                 if (targetEnd < seg.start) targetEnd = seg.start
                 const { end } = resizeSegment(props.segments, seg.id, seg.start, targetEnd, props.max)
-                if (end !== seg.end) props.onChange(seg.id, seg.start, end)
+                if (end !== seg.end) {
+                    props.onChange(seg.id, seg.start, end)
+                    props.onSeek(end) // Update playhead to new end
+                }
             }
         } else if (type === 'move') {
             const duration = seg.end - seg.start
@@ -114,7 +141,11 @@ export function TimelineTrack(props: TimelineTrackProps) {
             if (newStart < minTime) { newStart = minTime; newEnd = newStart + duration; }
             if (newEnd > maxTime) { newEnd = maxTime; newStart = newEnd - duration; }
 
-            if (newStart !== seg.start) props.onChange(seg.id, newStart, newEnd)
+            if (newStart !== seg.start) {
+                props.onChange(seg.id, newStart, newEnd)
+                props.onSeek(newStart) // Focus on start time while moving? Or maybe keep relative?
+                // For moving, seeing the start frame is usually most useful.
+            }
         }
     }
 

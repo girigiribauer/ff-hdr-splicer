@@ -26,14 +26,15 @@ describe('timeline', () => {
     })
 
     describe('createSegmentSpecs', () => {
-        it('空きスペースがある場合、指定通りのセグメントを作成できる', () => {
+        it('空きスペースがある場合、動画の最後まで埋める (Smart Fill)', () => {
+            // Duration (5) is ignored, fills until maxDur (100)
             const result = createSegmentSpecs([], 10, 5, maxDur)
-            expect(result).toEqual({ start: 10, end: 15 })
+            expect(result).toEqual({ start: 10, end: 100 })
         })
 
-        it('次のセグメントに衝突する場合、長さを制限して作成する', () => {
+        it('次のセグメントがある場合、その直前まで埋める (Smart Fill)', () => {
             const existing: Segment[] = [{ id: '1', start: 20, end: 30 }]
-            // Start at 10, try to add 15 (end 25). Should stop at 20.
+            // Start at 10. Duration (15) ignored. Next seg at 20.
             const result = createSegmentSpecs(existing, 10, 15, maxDur)
             expect(result).toEqual({ start: 10, end: 20 })
         })

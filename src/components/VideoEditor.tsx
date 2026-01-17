@@ -267,6 +267,7 @@ export function VideoEditor(props: VideoEditorProps) {
                         onSelectSegment={setSelectedSegmentId}
                         onAddSegment={handleAddSegment}
                         onRemoveSegment={handleRemoveSegment}
+                        onSeek={handleSeek}
                     />
                 </div>
 
