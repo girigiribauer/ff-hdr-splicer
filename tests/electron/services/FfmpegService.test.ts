@@ -28,9 +28,6 @@ describe('FfmpegService', () => {
             child.stderr = new EventEmitter()
             child.kill = vi.fn()
 
-            // Basic stderr handler
-            // child.stderr.on = (event: string, cb: any) => { /* no-op */ } // Removed to allow listeners
-
             setTimeout(() => {
                 // Check if this is the probe command or the main command
                 const isProbe = command.includes('ffprobe') || (args && args[1] === 'ffprobe')
@@ -58,7 +55,6 @@ describe('FfmpegService', () => {
                         child.emit('close', 0)
                     }
                 } else {
-                    // Assume ffmpeg (splice command or proxy)
                     child.stdout.emit('data', stdout)
                     // Emit stderr events if provided (simulating progress)
                     if (stderrEvents && stderrEvents.length > 0) {
@@ -159,6 +155,10 @@ describe('FfmpegService', () => {
             expect(args).toContain('-filter_complex')
             const filter = args[args.indexOf('-filter_complex') + 1]
             expect(filter).toContain('concat=n=2')
+
+            // 10bit出力の確認
+            expect(args).toContain('-pix_fmt')
+            expect(args).toContain('yuv420p10le')
         })
 
         it('Crossfade有効（複数セグメント）時、xfade/acrossfadeフィルタチェーンが構築される', async () => {
@@ -304,6 +304,9 @@ describe('FfmpegService', () => {
             expect(args).toContain('scale=-1:480')
             expect(args).toContain('libx264')
             expect(args).toContain('ultrafast')
+            // 8bit強制出力の確認
+            expect(args).toContain('-pix_fmt')
+            expect(args).toContain('yuv420p')
         })
 
         it('進捗コールバックが呼ばれる', async () => {

@@ -215,6 +215,7 @@ export async function spliceSegments(
         '-map', '[v]',
         '-map', '[a]',
         '-c:v', 'libx265',
+        '-pix_fmt', 'yuv420p10le', // Force 10-bit output to prevent gray artifacts/banding in HDR fades
         '-crf', '20',
         '-preset', 'fast',
         '-tag:v', 'hvc1',
