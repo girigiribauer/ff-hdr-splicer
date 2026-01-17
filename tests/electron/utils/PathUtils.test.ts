@@ -24,11 +24,16 @@ describe('PathUtils', () => {
         })
 
         it('エンコードされたパスも正しく処理される', () => {
-            // media://...%E5%8B%95%E7%94%BB... -> file://... -> decoded path
-            const input = 'media:///Users/test/%E5%8B%95%E7%94%BB.mp4'
-            const expected = fileURLToPath('file:///Users/test/%E5%8B%95%E7%94%BB.mp4')
+            // Use platform specific path to avoid "File URL path must be absolute" error on Windows
+            // when feeding a POSIX path to fileURLToPath.
+            const isWin = process.platform === 'win32'
+            const basePath = isWin ? 'C:/Users/test/' : '/Users/test/'
 
-            const result = normalizeMediaUrlToPath(input, 'darwin')
+            // media://...%E5%8B%95%E7%94%BB... -> file://... -> decoded path
+            const input = `media://${basePath}%E5%8B%95%E7%94%BB.mp4`
+            const expected = fileURLToPath(`file://${basePath}%E5%8B%95%E7%94%BB.mp4`)
+
+            const result = normalizeMediaUrlToPath(input, process.platform)
             expect(result).toBe(expected)
         })
     })
