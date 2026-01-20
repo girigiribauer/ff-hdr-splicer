@@ -10,7 +10,7 @@ interface TimelineTrackProps {
     segments: Segment[]
     onChange: (id: string, start: number, end: number) => void
     onSelectSegment: (id: string | null) => void
-    onAddSegment: (time: number, initialDuration?: number) => string | null
+    onAddSegment: (time: number) => string | null
     onRemoveSegment: (id: string) => void
     selectedSegmentId: string | null
     enableFadeIn: boolean

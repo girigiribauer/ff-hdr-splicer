@@ -60,8 +60,6 @@ export function VideoEditor(props: VideoEditorProps) {
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
         if (isFinite(vid.duration)) {
-            // Only set duration on initial load (Original File).
-            // Do NOT update on Proxy load, as Proxy might be incomplete/shorter, which causes timeline corruption.
             if (duration() === 0) {
                 setDuration(vid.duration)
             }
@@ -105,16 +103,15 @@ export function VideoEditor(props: VideoEditorProps) {
     }
 
     const handleSegmentChange = (id: string, start: number, end: number) => {
-        // Validation: Prevent negative duration or micro-segments
-        if (start >= end - 0.1) return // Enforce min 0.1s duration
+        if (start >= end - 0.1) return
         setSegments(prev => prev.map(s => s.id === id ? { ...s, start, end } : s))
     }
 
-    const handleAddSegment = (time: number, initialDuration: number = 2.0) => {
+    const handleAddSegment = (time: number) => {
         const dur = duration()
         const segs = segments()
 
-        const specs = createSegmentSpecs(segs, time, initialDuration, dur)
+        const specs = createSegmentSpecs(segs, time, dur)
         if (!specs) return null
 
         const newId = crypto.randomUUID()
@@ -133,8 +130,6 @@ export function VideoEditor(props: VideoEditorProps) {
 
     const handleSplitOrAddSegment = () => {
         const time = currentTime()
-        // Strict boundary check, but with tolerance for "Edge Clicks"
-        // If click is very close to Edge, treat it as OUTSIDE (Add Segment mode) to prevent micro-splits.
         const EDGE_TOLERANCE = 0.1
         const currentSeg = segments().find(s => time > s.start + EDGE_TOLERANCE && time < s.end - EDGE_TOLERANCE)
 
@@ -151,12 +146,9 @@ export function VideoEditor(props: VideoEditorProps) {
             setSelectedSegmentId(newId2)
             props.addLog(`Split segment at ${time.toFixed(3)}s`)
         } else {
-            // No segment underneath (or clicked exactly on edge) -> Add new segment
             const newId = handleAddSegment(time)
             if (newId) {
                 props.addLog(`Added segment at ${time.toFixed(3)}s`)
-            } else {
-                // props.addLog('Could not add segment (Overlap or too short)')
             }
         }
     }

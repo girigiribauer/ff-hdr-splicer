@@ -30,7 +30,6 @@ export function findOverlap(
 export function createSegmentSpecs(
     segments: Segment[],
     time: number,
-    duration: number,
     maxDuration: number
 ): { start: number, end: number } | null {
     if (findOverlap(segments, time, time)) {

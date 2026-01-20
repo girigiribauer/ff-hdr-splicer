@@ -27,21 +27,19 @@ describe('timeline', () => {
 
     describe('createSegmentSpecs', () => {
         it('空きスペースがある場合、動画の最後まで埋める (Smart Fill)', () => {
-            // Duration (5) is ignored, fills until maxDur (100)
-            const result = createSegmentSpecs([], 10, 5, maxDur)
+            const result = createSegmentSpecs([], 10, maxDur)
             expect(result).toEqual({ start: 10, end: 100 })
         })
 
         it('次のセグメントがある場合、その直前まで埋める (Smart Fill)', () => {
             const existing: Segment[] = [{ id: '1', start: 20, end: 30 }]
-            // Start at 10. Duration (15) ignored. Next seg at 20.
-            const result = createSegmentSpecs(existing, 10, 15, maxDur)
+            const result = createSegmentSpecs(existing, 10, maxDur)
             expect(result).toEqual({ start: 10, end: 20 })
         })
 
         it('既存セグメントの上で開始しようとした場合、nullを返す', () => {
             const existing: Segment[] = [{ id: '1', start: 10, end: 20 }]
-            const result = createSegmentSpecs(existing, 15, 5, maxDur)
+            const result = createSegmentSpecs(existing, 15, maxDur)
             expect(result).toBeNull()
         })
     })
@@ -54,13 +52,11 @@ describe('timeline', () => {
         ]
 
         it('開始位置の変更時、前のセグメントに衝突しないよう制限する', () => {
-            // Resize '2' start to 5. '1' ends at 10. Should clamp to 10.
             const res = resizeSegment(segs, '2', 5, 30, maxDur)
             expect(res.start).toBe(10)
         })
 
         it('終了位置の変更時、次のセグメントに衝突しないよう制限する', () => {
-            // Resize '2' end to 45. '3' starts at 40. Should clamp to 40.
             const res = resizeSegment(segs, '2', 20, 45, maxDur)
             expect(res.end).toBe(40)
         })
