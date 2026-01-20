@@ -1,6 +1,6 @@
 # FF HDR Splicer
 
-ffmpeg を内部で利用して、HDR動画（HT.2020 / PQ / HLG）のトリミング・スライスができるデスクトップアプリです。
+FFmpeg を内部で利用して、HDR動画（HT.2020 / PQ / HLG）のトリミング・スライスができるデスクトップアプリです。
 
 ## ユーザーガイド (For Users)
 
@@ -22,7 +22,6 @@ Apple Silicon (M1/M2/etc) 環境では、Webからダウンロードした未署
 
 ```bash
 xattr -cr /path/to/extracted/FF\ HDR\ Splicer.app
-# 例: xattr -cr /Applications/FF\ HDR\ Splicer.app
 ```
 
 ### 使い方
@@ -74,3 +73,10 @@ GitHub Actions を使ってクロスプラットフォームビルドを行い�
     ```
 3.  **公開**:
     GitHub Actions がドラフトリリースを作成するので、Releases ページで確認し「Publish」ボタンを押して公開します。
+
+## ライセンス (License)
+
+このソフトウェアは **GPL v3 (GNU General Public License v3.0)** の下でライセンスされています。詳細は [LICENSE](LICENSE) ファイルをご確認ください。
+
+本ソフトウェアは、[FFmpeg](https://ffmpeg.org) プロジェクトのコードを使用しており、FFmpeg のライセンス (GPL v3) に準拠して配布されています。
+This software uses code of [FFmpeg](https://ffmpeg.org) licensed under the [GPLv3.0](https://www.gnu.org/licenses/gpl-3.0.html) and its source can be downloaded [here](https://ffmpeg.org/download.html).
