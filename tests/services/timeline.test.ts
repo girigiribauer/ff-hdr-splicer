@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Segment } from '../../src/models/Segment'
-import { createSegmentSpecs, getNextSelectedId, resizeSegment, validateSegment } from '../../src/services/timeline'
+import { createSegmentSpecs, getNextSelectedId, resizeSegment, validateSegment, findSnapTime, getTimeFromX } from '../../src/services/timeline'
 
 describe('timeline', () => {
     const maxDur = 100
@@ -87,6 +87,55 @@ describe('timeline', () => {
             const one: Segment[] = [{ id: 'A', start: 0, end: 10 }]
             const next = getNextSelectedId(one, 'A')
             expect(next).toBeNull()
+        })
+    })
+
+    describe('findSnapTime', () => {
+        // Mock converter: 100px width, max 100s -> 1px = 1s
+        const timeToPx = (t: number) => t
+        const candidates = [0, 50, 100]
+
+        it('指定範囲内（デフォルト10px）にあれば、最も近い候補にスナップする', () => {
+            // 45px -> closest to 50 (diff 5) -> snaps
+            expect(findSnapTime(45, timeToPx, candidates)).toBe(50)
+            expect(findSnapTime(55, timeToPx, candidates)).toBe(50)
+            expect(findSnapTime(92, timeToPx, candidates)).toBe(100)
+            expect(findSnapTime(8, timeToPx, candidates)).toBe(0)
+        })
+
+        it('範囲外なら null を返す', () => {
+            // 30 -> closest 50 (diff 20) -> no snap (threshold 10)
+            expect(findSnapTime(30, timeToPx, candidates)).toBeNull()
+        })
+
+        it('複数の候補がある場合、最も近いものを選ぶ', () => {
+            const dense = [10, 15]
+            expect(findSnapTime(11, timeToPx, dense)).toBe(10) // diff 1
+            expect(findSnapTime(14, timeToPx, dense)).toBe(15) // diff 1
+        })
+    })
+
+    describe('getTimeFromX', () => {
+        // Rect: left 10, width 100
+        const rect = { left: 10, width: 100 } as DOMRect
+        const min = 0
+        const max = 200 // 100px represents 200s (1px = 2s)
+
+        it('座標に対応する時間を計算する', () => {
+            // clientX 10 (left edge) -> 0% -> 0s
+            expect(getTimeFromX(10, rect, min, max)).toBe(0)
+            // clientX 60 (center) -> 50% -> 100s
+            expect(getTimeFromX(60, rect, min, max)).toBe(100)
+            // clientX 110 (right edge) -> 100% -> 200s
+            expect(getTimeFromX(110, rect, min, max)).toBe(200)
+        })
+
+        it('範囲外（左側）のクリックは最小値にクランプする', () => {
+            expect(getTimeFromX(0, rect, min, max)).toBe(0)
+        })
+
+        it('範囲外（右側）のクリックは最大値にクランプする', () => {
+            expect(getTimeFromX(200, rect, min, max)).toBe(200)
         })
     })
 })

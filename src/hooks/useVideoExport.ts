@@ -11,10 +11,14 @@ interface ExportOptions {
 export function useVideoExport(addLog: (msg: string) => void) {
     const [isExporting, setIsExporting] = createSignal<boolean>(false)
     const [exportProgress, setExportProgress] = createSignal(0)
+    const [exportStatus, setExportStatus] = createSignal<string>('Initializing...')
 
     // Setup Progress Listener
     createComputed(() => {
-        const onProgress = (_: any, data: any) => setExportProgress(data.percent)
+        const onProgress = (_: any, data: any) => {
+            setExportProgress(data.percent)
+            if (data.phase) setExportStatus(data.phase)
+        }
         if (window.ipcRenderer) {
             window.ipcRenderer.on('export-progress', onProgress)
             onCleanup(() => {
@@ -52,6 +56,7 @@ export function useVideoExport(addLog: (msg: string) => void) {
 
             setIsExporting(true)
             setExportProgress(0)
+            setExportStatus('Starting...')
             const outPath = saveResult.filePath
             addLog(`Exporting ${currentSegments.length} segments to ${outPath}`)
 
@@ -62,9 +67,10 @@ export function useVideoExport(addLog: (msg: string) => void) {
                 segments: exportSegments,
                 outputFilePath: outPath,
                 fadeOptions: {
+                    fadeInOut: fadeOptions.fadeInOut,
                     crossfade: fadeOptions.crossfade,
-                    fadeDuration: fadeOptions.fadeInOut ? fadeOptions.fadeDuration : 0,
-                    crossfadeDuration: fadeOptions.crossfade ? fadeOptions.crossfadeDuration : 0
+                    fadeDuration: fadeOptions.fadeDuration,
+                    crossfadeDuration: fadeOptions.crossfadeDuration
                 }
             })
 
@@ -88,6 +94,7 @@ export function useVideoExport(addLog: (msg: string) => void) {
     return {
         isExporting,
         exportProgress,
+        exportStatus,
         startExport
     }
 }

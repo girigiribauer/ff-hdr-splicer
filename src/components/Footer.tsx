@@ -54,7 +54,23 @@ export const Footer: Component<FooterProps> = (props) => {
             <Show when={showLogs()}>
                 <div class={styles.logModal}>
                     <div class={styles.logHeader}>
-                        <span>Application Logs</span>
+                        <div class={styles.headerTitleGroup}>
+                            <span>Application Logs</span>
+                            <button
+                                onClick={async () => {
+                                    const text = props.logs.join('\n')
+                                    if (window.ipcRenderer) {
+                                        await window.ipcRenderer.invoke('write-clipboard', text)
+                                    } else {
+                                        navigator.clipboard.writeText(text)
+                                    }
+                                    alert('Copied to clipboard!')
+                                }}
+                                class={styles.copyBtn}
+                            >
+                                Copy All
+                            </button>
+                        </div>
                         <button
                             onClick={() => setShowLogs(false)}
                             class={styles.closeBtn}

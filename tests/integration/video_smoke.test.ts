@@ -54,8 +54,8 @@ describe('動画結合機能の統合テスト (実バイナリ動作確認)', (
 
         const segments = [{ start: 0, end: 1.0 }]
 
-        console.log('Starting spliceSegments integration test...')
-        const result = await FfmpegService.spliceSegments(SRC_FILE, segments, OUT_FILE, {
+        const result = await FfmpegService.smartSplice(SRC_FILE, segments, OUT_FILE, {
+            fadeInOut: false,
             crossfade: false,
             fadeDuration: 0.1,
             crossfadeDuration: 0
@@ -70,6 +70,5 @@ describe('動画結合機能の統合テスト (実バイナリ動作確認)', (
 
         const stats = fs.statSync(OUT_FILE)
         expect(stats.size).toBeGreaterThan(0)
-        console.log(`Smoke test output size: ${stats.size} bytes`)
     }, 60000)
 })

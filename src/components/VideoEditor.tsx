@@ -25,7 +25,7 @@ interface VideoEditorProps {
 }
 
 export function VideoEditor(props: VideoEditorProps) {
-    const [duration, setDuration] = createSignal<number>(30)
+    const [duration, setDuration] = createSignal<number>(0)
     const [currentTime, setCurrentTime] = createSignal<number>(0)
     const [segments, setSegments] = createSignal<Segment[]>([])
     const [selectedSegmentId, setSelectedSegmentId] = createSignal<string | null>(null)
@@ -45,7 +45,7 @@ export function VideoEditor(props: VideoEditorProps) {
         props.addLog
     )
 
-    const { isExporting, exportProgress, startExport } = useVideoExport(props.addLog)
+    const { isExporting, exportProgress, exportStatus, startExport } = useVideoExport(props.addLog)
 
     const getMediaUrl = (path: string) => toMediaUrl(path, proxyPath())
 
@@ -60,7 +60,11 @@ export function VideoEditor(props: VideoEditorProps) {
     const handleLoadedMetadata = (e: Event) => {
         const vid = e.target as HTMLVideoElement
         if (isFinite(vid.duration)) {
-            setDuration(vid.duration)
+            // Only set duration on initial load (Original File).
+            // Do NOT update on Proxy load, as Proxy might be incomplete/shorter, which causes timeline corruption.
+            if (duration() === 0) {
+                setDuration(vid.duration)
+            }
             if (segments().length === 0) {
                 const newId = crypto.randomUUID()
                 const start = 0
@@ -101,11 +105,16 @@ export function VideoEditor(props: VideoEditorProps) {
     }
 
     const handleSegmentChange = (id: string, start: number, end: number) => {
+        // Validation: Prevent negative duration or micro-segments
+        if (start >= end - 0.1) return // Enforce min 0.1s duration
         setSegments(prev => prev.map(s => s.id === id ? { ...s, start, end } : s))
     }
 
     const handleAddSegment = (time: number, initialDuration: number = 2.0) => {
-        const specs = createSegmentSpecs(segments(), time, initialDuration, duration())
+        const dur = duration()
+        const segs = segments()
+
+        const specs = createSegmentSpecs(segs, time, initialDuration, dur)
         if (!specs) return null
 
         const newId = crypto.randomUUID()
@@ -124,7 +133,10 @@ export function VideoEditor(props: VideoEditorProps) {
 
     const handleSplitOrAddSegment = () => {
         const time = currentTime()
-        const currentSeg = segments().find(s => time > s.start && time < s.end)
+        // Strict boundary check, but with tolerance for "Edge Clicks"
+        // If click is very close to Edge, treat it as OUTSIDE (Add Segment mode) to prevent micro-splits.
+        const EDGE_TOLERANCE = 0.1
+        const currentSeg = segments().find(s => time > s.start + EDGE_TOLERANCE && time < s.end - EDGE_TOLERANCE)
 
         if (currentSeg) {
             const newId1 = crypto.randomUUID()
@@ -139,11 +151,12 @@ export function VideoEditor(props: VideoEditorProps) {
             setSelectedSegmentId(newId2)
             props.addLog(`Split segment at ${time.toFixed(3)}s`)
         } else {
+            // No segment underneath (or clicked exactly on edge) -> Add new segment
             const newId = handleAddSegment(time)
             if (newId) {
                 props.addLog(`Added segment at ${time.toFixed(3)}s`)
             } else {
-                props.addLog('Could not add segment (Overlap or too short)')
+                // props.addLog('Could not add segment (Overlap or too short)')
             }
         }
     }
@@ -288,9 +301,10 @@ export function VideoEditor(props: VideoEditorProps) {
                 </div>
             </div>
 
+
             <ProgressOverlay
                 isVisible={isExporting()}
-                message="Exporting..."
+                message={exportStatus() || "Exporting..."}
                 progress={exportProgress()}
                 color="green"
             />

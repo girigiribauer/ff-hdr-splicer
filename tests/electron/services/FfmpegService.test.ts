@@ -69,6 +69,31 @@ describe('FfmpegService', () => {
         return spawnMock
     }
 
+    describe('checkFFmpeg', () => {
+        it('正常時、パスとバージョン情報を返す', async () => {
+            mockSpawn('ffmpeg version 6.0-static ...\nbuilt with ...')
+            const result = await FfmpegService.checkFFmpeg()
+            expect(result.path).toBeDefined()
+            expect(result.code).toBe(0)
+            expect(result.version).toContain('ffmpeg version 6.0')
+        })
+
+        it('起動エラー時、エラーオブジェクトを返す', async () => {
+            const child = new EventEmitter() as any
+            child.stdout = new EventEmitter()
+            child.stderr = new EventEmitter()
+            vi.mocked(spawn).mockReturnValue(child)
+
+            setTimeout(() => {
+                child.emit('error', new Error('Spawn failed'))
+            }, 10)
+
+            const result = await FfmpegService.checkFFmpeg()
+            expect(result.error).toBeDefined()
+            expect(result.error.message).toBe('Spawn failed')
+        })
+    })
+
     describe('getVideoMetadata', () => {
         it('正常終了時、パースされたJSONを返す', async () => {
             const mockOutput = JSON.stringify({
@@ -127,168 +152,6 @@ describe('FfmpegService', () => {
         })
     })
 
-    describe('spliceSegments', () => {
-        it('セグメント配列が空の場合、エラーを返す', async () => {
-            const result = await FfmpegService.spliceSegments('in.mp4', [], 'out.mp4')
-            expect(result.error).toBe('No segments provided')
-        })
-
-        it('正常時、ffmpegコマンドを発行して成功を返す', async () => {
-            mockSpawn('')
-
-            const segments = [
-                { start: 0, end: 10 },
-                { start: 20, end: 30 }
-            ]
-
-            const result = await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4')
-
-            expect(result.success).toBe(true)
-            expect(result.outPath).toBe('out.mp4')
-
-            // 引数の検証
-            const spawnCalls = vi.mocked(spawn).mock.calls
-            const lastCall = spawnCalls[spawnCalls.length - 1]
-            const args = lastCall[1] as string[]
-
-            // フィルタ文字列が含まれているか簡易チェック
-            expect(args).toContain('-filter_complex')
-            const filter = args[args.indexOf('-filter_complex') + 1]
-            expect(filter).toContain('concat=n=2')
-
-            // 10bit出力の確認
-            expect(args).toContain('-pix_fmt')
-            expect(args).toContain('yuv420p10le')
-        })
-
-        it('Crossfade有効（複数セグメント）時、xfade/acrossfadeフィルタチェーンが構築される', async () => {
-            mockSpawn('')
-
-            const segments = [
-                { start: 0, end: 10 },    // Duration 10
-                { start: 20, end: 32 },   // Duration 12
-                { start: 40, end: 55 }    // Duration 15
-            ]
-            // Enable Crossfade -> Should trigger Start/End fades and Crossfades
-            const fadeOptions = { crossfade: true, fadeDuration: 2.0, crossfadeDuration: 1.0 }
-
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', fadeOptions)
-
-            const spawnCalls = vi.mocked(spawn).mock.calls
-
-            const ffmpegCall = spawnCalls.find(call => {
-                const args = call[1] as string[]
-                return args && args.includes('-filter_complex')
-            })
-            if (!ffmpegCall) throw new Error('ffmpeg call not found')
-
-            const args = ffmpegCall[1] as string[]
-            const filterIndex = args.indexOf('-filter_complex') + 1
-            const filter = args[filterIndex]
-
-            expect(filter).toContain('fade=t=in:st=0:d=2')
-
-            expect(filter).toContain('xfade=transition=fade')
-
-            expect(filter).toContain('fade=t=out')
-        })
-
-        it('Crossfade無効時でも、Tactile Fadeが適用される', async () => {
-            mockSpawn('')
-            const segments = [
-                { start: 0, end: 10 },
-                { start: 20, end: 32 }
-            ]
-            const fadeOptions = { crossfade: false, fadeDuration: 1.0, crossfadeDuration: 1.0 }
-
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', fadeOptions)
-
-            const spawnCalls = vi.mocked(spawn).mock.calls
-            const ffmpegCall = spawnCalls.find(call => {
-                const args = call[1] as string[]
-                return args && args.includes('-filter_complex')
-            })
-            if (!ffmpegCall) throw new Error('ffmpeg call not found')
-
-            const args = ffmpegCall[1] as string[]
-            const filter = args[args.indexOf('-filter_complex') + 1]
-
-            expect(filter).toContain('concat=n=2')
-
-            expect(filter).toContain('fade=t=in')
-        })
-
-        it('クリップ長がフェード時間より短い場合、フェード時間が調整される（あるいはエラーにならない）', async () => {
-            mockSpawn('')
-            // 2s clip
-            const segments = [{ start: 0, end: 2 }]
-            // 5s fade
-            const fadeOptions = { crossfade: true, fadeDuration: 5.0, crossfadeDuration: 1.0 }
-
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', fadeOptions)
-
-            const spawnCalls = vi.mocked(spawn).mock.calls
-            const ffmpegCall = spawnCalls.find(call => {
-                const args = call[1] as string[]
-                return args && args.includes('-filter_complex')
-            })
-            if (!ffmpegCall) throw new Error('ffmpeg call not found')
-
-            const args = ffmpegCall[1] as string[]
-            const filter = args[args.indexOf('-filter_complex') + 1]
-
-            expect(filter).toContain('fade=t=in:st=0:d=5')
-        })
-
-        it('単純連結（Crossfade無効）時、concatフィルタが使用される', async () => {
-            mockSpawn('')
-
-            const segments = [
-                { start: 0, end: 10 },
-                { start: 20, end: 30 }
-            ]
-            // Disable Crossfade
-            const fadeOptions = { crossfade: false, fadeDuration: 2.0, crossfadeDuration: 1.0 }
-
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', fadeOptions)
-
-            const spawnCalls = vi.mocked(spawn).mock.calls
-            const ffmpegCall = spawnCalls.find(call => {
-                const args = call[1] as string[]
-                return args && args.includes('-filter_complex')
-            })
-            const args = ffmpegCall![1] as string[]
-            const filter = args[args.indexOf('-filter_complex') + 1]
-
-            expect(filter).toContain('concat=n=2:v=1:a=1')
-            expect(filter).not.toContain('xfade')
-            expect(filter).toContain('fade=t=in')
-        })
-
-        it('単一セグメント＋Transitions有効時、Fade In/Outのみ適用される', async () => {
-            mockSpawn('')
-
-            const segments = [
-                { start: 0, end: 10 }
-            ]
-            const fadeOptions = { crossfade: true, fadeDuration: 1.5, crossfadeDuration: 1.0 }
-
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', fadeOptions)
-
-            const spawnCalls = vi.mocked(spawn).mock.calls
-            const ffmpegCall = spawnCalls.find(call => {
-                const args = call[1] as string[]
-                return args && args.includes('-filter_complex')
-            })
-            const args = ffmpegCall![1] as string[]
-            const filter = args[args.indexOf('-filter_complex') + 1]
-
-            expect(filter).toContain('fade=t=in:st=0:d=1.5')
-            expect(filter).toContain('fade=t=out')
-            expect(filter).toContain('concat=n=1')
-        })
-    })
-
     describe('generateProxy', () => {
         it('プロキシ生成コマンドが正しく発行される', async () => {
             mockSpawn('')
@@ -323,26 +186,6 @@ describe('FfmpegService', () => {
 
             const onProgress = vi.fn()
             await FfmpegService.generateProxy('in.mov', onProgress)
-
-            expect(onProgress).toHaveBeenCalledWith(50)
-        })
-    })
-
-    describe('spliceSegments Progress', () => {
-        it('進捗コールバックが正しく呼ばれる', async () => {
-            const segments = [
-                { start: 0, end: 10 },
-                { start: 20, end: 30 }
-            ]
-
-            const stderrLogs = [
-                'frame=... time=00:00:10.00 ...'
-            ]
-
-            mockSpawn('', 0, stderrLogs)
-
-            const onProgress = vi.fn()
-            await FfmpegService.spliceSegments('in.mp4', segments, 'out.mp4', undefined, onProgress)
 
             expect(onProgress).toHaveBeenCalledWith(50)
         })

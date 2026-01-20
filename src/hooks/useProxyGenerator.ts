@@ -1,4 +1,4 @@
-import { createSignal, createComputed, onCleanup } from 'solid-js'
+import { createSignal, createComputed, onCleanup, untrack } from 'solid-js'
 
 export function useProxyGenerator(filePath: () => string, addLog: (msg: string) => void) {
     const [proxyPath, setProxyPath] = createSignal<string | null>(null)
@@ -31,13 +31,13 @@ export function useProxyGenerator(filePath: () => string, addLog: (msg: string) 
             const res = await window.ipcRenderer.invoke('run-generate-proxy', path)
             if (res.success && res.proxyPath) {
                 setProxyPath(res.proxyPath)
-                addLog('Proxy generated for preview.')
+                untrack(() => addLog('Proxy generated for preview.'))
             } else {
-                addLog(`Proxy generation failed: ${res.error}`)
+                untrack(() => addLog(`Proxy generation failed: ${res.error}`))
                 if (res.stderr) {
-                   // Log last 200 chars of stderr to avoid spamming
-                   const errLog = res.stderr.slice(-200)
-                   addLog(`FFmpeg stderr (tail): ${errLog}`)
+                    // Log last 200 chars of stderr to avoid spamming
+                    const errLog = res.stderr.slice(-200)
+                    untrack(() => addLog(`FFmpeg stderr (tail): ${errLog}`))
                 }
             }
         } catch (e: any) {

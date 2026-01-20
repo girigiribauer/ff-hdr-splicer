@@ -37,7 +37,7 @@ export function createSegmentSpecs(
         return null
     }
 
-    let start = time
+    let start = Math.min(time, maxDuration)
 
     const sorted = sortSegments(segments)
     const nextSeg = sorted.find(s => s.start > time + 0.001) // Margin to avoid self-overlap issues
@@ -45,14 +45,14 @@ export function createSegmentSpecs(
     // Fill to next segment or max duration
     let end = nextSeg ? nextSeg.start : maxDuration
 
-    // Previous implementation used fixed duration, now we fill available space.
-    // However, if the gap is extremely small, we might want to return null?
-    // User requested "expand as much as possible".
-    // If end - start is very small (e.g. < 0.1s), the UI usually handles it (or it's just a tiny segment).
-
     // Ensure we don't exceed maxDuration (redundant if nextSeg logic is correct, but safe)
     if (end > maxDuration) {
         end = maxDuration
+    }
+
+    // Minimum duration check to prevent garbage segments
+    if (end - start < 0.1) {
+        return null
     }
 
     return { start, end }
@@ -101,4 +101,31 @@ export function getNextSelectedId(segments: Segment[], deletedId: string): strin
     }
 
     return null
+}
+
+// Helper to find snap target
+export function findSnapTime(
+    currentPx: number,
+    timeToPx: (t: number) => number,
+    candidates: number[],
+    thresholdPx: number = 10
+): number | null {
+    let bestDiff = Infinity
+    let snapTarget = -1
+
+    candidates.forEach(t => {
+        const px = timeToPx(t)
+        const diff = Math.abs(px - currentPx)
+        if (diff < thresholdPx && diff < bestDiff) {
+            bestDiff = diff
+            snapTarget = t
+        }
+    })
+
+    return snapTarget !== -1 ? snapTarget : null
+}
+
+export function getTimeFromX(clientX: number, rect: DOMRect, min: number, max: number): number {
+    const percent = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1)
+    return min + percent * (max - min)
 }

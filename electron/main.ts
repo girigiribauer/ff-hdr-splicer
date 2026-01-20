@@ -126,8 +126,8 @@ app.whenReady().then(() => {
       outPath = path.join(outDirTarget, `${name}_splice_${Date.now()}${ext}`)
     }
 
-    return await FfmpegService.spliceSegments(filePath, segments, outPath, fadeOptions, (percent) => {
-      _event.sender.send('export-progress', { percent })
+    return await FfmpegService.smartSplice(filePath, segments, outPath, fadeOptions, (percent, phase) => {
+      _event.sender.send('export-progress', { percent, phase })
     })
   })
 
@@ -136,6 +136,12 @@ app.whenReady().then(() => {
     return await FfmpegService.generateProxy(filePath, (percent) => {
       _event.sender.send('proxy-progress', { percent })
     })
+  })
+
+  ipcMain.handle('write-clipboard', async (_event, text) => {
+    const { clipboard } = await import('electron')
+    clipboard.writeText(text)
+    return true
   })
 
 
